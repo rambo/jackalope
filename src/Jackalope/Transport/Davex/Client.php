@@ -24,6 +24,7 @@ namespace Jackalope\Transport\Davex;
 use Jackalope\Transport\curl;
 use Jackalope\TransportInterface;
 use DOMDocument;
+use DOMXPath;
 
 /**
  * Connection to one Jackrabbit server.
@@ -107,6 +108,14 @@ class Client implements TransportInterface
     protected $curl = null;
 
     /**
+     * The transaction token received by a LOCKing request
+     *
+     * Is FALSE while no transaction running.
+     * @var string|FALSE
+     */
+    protected $transactionToken = false;
+
+    /**
      * Create a transport pointing to a server url.
      *
      * @param serverUri location of the server
@@ -133,7 +142,7 @@ class Client implements TransportInterface
     /**
      * Opens a cURL session if not yet one open.
      *
-     * @return null|false False in case there is already an open connection, else null;
+     * @return Jackalope\Transport\Davex\Request    The Request
      */
     protected function getRequest($method, $uri)
     {
@@ -402,6 +411,7 @@ class Client implements TransportInterface
         $body .= $this->createNodeMarkup($path, $properties, $children);
 
         $request = $this->getRequest(Request::MKCOL, $path);
+        $request->setLockToken($this->transactionToken);
         $request->setBody($body);
         $request->execute();
 
@@ -555,6 +565,68 @@ class Client implements TransportInterface
     }
 
     /**
+     * Initiates a «local transaction» on the root node
+     *
+     * @return  string  The received transaction token
+     * @throws  \PHPCR\RepositoryException  If no transaction token received
+     */
+    public function beginTransaction()
+    {
+        $request = $this->getRequest(Request::LOCK, $this->workspaceUriRoot);
+        $request->setDepth('infinity');
+        $request->setBody('<?xml version="1.0" encoding="utf-8"?>'.
+            '<D:lockinfo xmlns:D="'.self::NS_DAV.'" xmlns:jcr="'.self::NS_DCR.'">'.
+            '   <D:lockscope><jcr:local /></D:lockscope>'.
+            '   <D:locktype><jcr:transaction /></D:locktype>'.
+            '</D:lockinfo>');
+
+        $dom = $request->executeDom();
+        $hrefs = $dom->getElementsByTagNameNS(self::NS_DAV, 'href');
+
+        if (!$hrefs->length) {
+            throw new \PHPCR\RepositoryException('No transaction token received');
+        }
+        $this->transactionToken = $hrefs->item(0)->textContent;
+        return $this->transactionToken;
+    }
+
+    /**
+     * Ends the transaction started with {@link beginTransaction()}
+     *
+     * @param   string  $tag    Either 'commit' or 'rollback'
+     */
+    protected function endTransaction($tag) {
+
+        if ($tag != 'commit' && $tag != 'rollback') {
+            throw new \InvalidArgumentException('Expected \'commit\' or \'rollback\' as argument');
+        }
+
+        $request = $this->getRequest(Request::UNLOCK, $this->workspaceUriRoot);
+        $request->setLockToken($this->transactionToken);
+        $request->setBody('<?xml version="1.0" encoding="utf-8"?>'.
+            '<jcr:transactioninfo xmlns:jcr="'.self::NS_DCR.'">'.
+            '   <jcr:transactionstatus><jcr:'.$tag.' /></jcr:transactionstatus>'.
+            '</jcr:transactioninfo>');
+
+        $request->execute();
+        $this->transactionToken = false;
+    }
+
+    /**
+     * Commits a transaction started with {@link beginTransaction()}
+     */
+    public function commit() {
+        $this->endTransaction('commit');
+    }
+
+    /**
+     * Rollbacks a transaction started with {@link beginTransaction()}
+     */
+    public function rollback() {
+        $this->endTransaction('rollback');
+    }
+
+    /**
      * Returns the XML required to request nodetypes
      *
      * @param array $nodesType The list of nodetypes you want to request for.
@@ -584,7 +656,7 @@ class Client implements TransportInterface
     protected function buildPropfindRequest($properties)
     {
         $xml = '<?xml version="1.0" encoding="UTF-8"?>'.
-            '<D:propfind xmlns:D="DAV:" xmlns:dcr="http://www.day.com/jcr/webdav/1.0"><D:prop>';
+            '<D:propfind xmlns:D="'.self::NS_DAV.'" xmlns:dcr="'.self::NS_DCR.'"><D:prop>';
         if (!is_array($properties)) {
             $properties = array($properties);
         }

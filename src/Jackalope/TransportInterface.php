@@ -70,5 +70,11 @@ interface TransportInterface
      * @see \Jackalope\Workspace::copy
      */
     public function copyNode($srcAbsPath, $dstAbsPath, $srcWorkspace = null);
+
+    public function beginTransaction();
+
+    public function commit();
+
+    public function rollback();
 }
 

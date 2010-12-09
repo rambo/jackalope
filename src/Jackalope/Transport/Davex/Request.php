@@ -77,6 +77,15 @@ class Request
      */
     const PROPPATCH = 'PROPPATCH';
 
+
+    /**  @var string  Identifier of the 'LOCK' http request method */
+    const LOCK = 'LOCK';
+
+
+    /**  @var string  Identifier of the 'UNLOCK' http request method */
+    const UNLOCK = 'UNLOCK';
+
+
     /**
      * Identifier of the 'COPY' http request method.
      * @var string
@@ -138,6 +147,11 @@ class Request
     protected $additionalHeaders = array();
 
     /**
+     * @var string|FALSE    The lock token active for this request otherwise FALSE for no locking
+     */
+    protected $lockToken = false;
+
+    /**
      * Initiaties the NodeTypes request object.
      *
      * @param array $arguments
@@ -177,6 +191,11 @@ class Request
         $this->additionalHeaders[] = $header;
     }
 
+    public function setLockToken($lockToken)
+    {
+        $this->lockToken = (string) $lockToken;
+    }
+
     /**
      * Requests the data to be identified by a formerly prepared request.
      *
@@ -207,6 +226,9 @@ class Request
             'User-Agent: '.self::USER_AGENT
         );
         $headers = array_merge($headers, $this->additionalHeaders);
+        if ($this->lockToken) {
+            $headers[] = 'Lock-Token: '.$this->lockToken.'';
+        }
 
         $this->curl->setopt(CURLOPT_RETURNTRANSFER, true);
         $this->curl->setopt(CURLOPT_CUSTOMREQUEST, $this->method);
@@ -275,7 +297,7 @@ class Request
         }
 
         $curlError = $this->curl->error();
-        $msg = "Unexpected error: \nCURL Error: $curlError \nResponse (HTTP $httpCode): {$this->method} {$this->uri} \n\n$response";
+        $msg = "Unexpected error\nCURL Error: $curlError \nRequest: {$this->method} {$this->uri}\nResponse (HTTP $httpCode):\n$response";
         throw new \PHPCR\RepositoryException($msg);
     }
 

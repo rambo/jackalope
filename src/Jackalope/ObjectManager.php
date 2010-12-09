@@ -357,62 +357,66 @@ class ObjectManager
      */
     public function save()
     {
-        // TODO: start transaction
+        $this->transport->beginTransaction();
 
-        // remove nodes/properties
-        foreach($this->itemsRemove as $path => $dummy) {
-            $this->transport->deleteItem($path);
-        }
+        try {
+            // remove nodes/properties
+            foreach($this->itemsRemove as $path => $dummy) {
+                $this->transport->deleteItem($path);
+            }
 
-        // move nodes/properties
-        foreach($this->nodesMove as $src => $dst) {
-            $this->transport->moveNode($src, $dst);
-        }
+            // move nodes/properties
+            foreach($this->nodesMove as $src => $dst) {
+                $this->transport->moveNode($src, $dst);
+            }
 
-        // filter out sub-nodes and sub-properties since the top-most nodes that are
-        // added will create all sub-nodes and sub-properties at once
-        $nodesToCreate = $this->itemsAdd;
-        foreach ($nodesToCreate as $path => $dummy) {
-            foreach ($nodesToCreate as $path2 => $dummy) {
-                if (strpos($path2, $path.'/') === 0) {
-                    unset($nodesToCreate[$path2]);
+            // filter out sub-nodes and sub-properties since the top-most nodes that are
+            // added will create all sub-nodes and sub-properties at once
+            $nodesToCreate = $this->itemsAdd;
+            foreach ($nodesToCreate as $path => $dummy) {
+                foreach ($nodesToCreate as $path2 => $dummy) {
+                    if (strpos($path2, $path.'/') === 0) {
+                        unset($nodesToCreate[$path2]);
+                    }
                 }
             }
-        }
-        // create new nodes
-        foreach($nodesToCreate as $path => $dummy) {
-            $item = $this->getNodeByPath($path);
-            if ($item instanceof \PHPCR\NodeInterface) {
-                $this->transport->storeItem($path, $item->getProperties(), $item->getNodes());
-            } elseif ($item instanceof \PHPCR\PropertyInterface) {
-                $this->transport->storeProperty($path, $item);
-            } else {
-                throw new \UnexpectedValueException('Unknown type '.get_class($item));
-            }
-        }
-
-        //loop through cached nodes and commit all dirty and set them to clean.
-        foreach($this->objectsByPath as $path => $item) {
-            if ($item->isModified()) {
+            // create new nodes
+            foreach($nodesToCreate as $path => $dummy) {
+                $item = $this->getNodeByPath($path);
                 if ($item instanceof \PHPCR\NodeInterface) {
-                    foreach ($item->getProperties() as $propertyName => $property) {
-                        if ($property->isModified()) {
-                            $this->transport->storeProperty($property->getPath(), $property);
-                        }
-                    }
+                    $this->transport->storeItem($path, $item->getProperties(), $item->getNodes());
                 } elseif ($item instanceof \PHPCR\PropertyInterface) {
-                    if ($item->getNativeValue() === null) {
-                        $this->transport->deleteProperty($path);
-                    } else {
-                        $this->transport->storeProperty($path, $item);
-                    }
+                    $this->transport->storeProperty($path, $item);
                 } else {
                     throw new \UnexpectedValueException('Unknown type '.get_class($item));
                 }
             }
-        }
 
-        // TODO: have a davex client method to commit transaction
+            //loop through cached nodes and commit all dirty and set them to clean.
+            foreach($this->objectsByPath as $path => $item) {
+                if ($item->isModified()) {
+                    if ($item instanceof \PHPCR\NodeInterface) {
+                        foreach ($item->getProperties() as $propertyName => $property) {
+                            if ($property->isModified()) {
+                                $this->transport->storeProperty($property->getPath(), $property);
+                            }
+                        }
+                    } elseif ($item instanceof \PHPCR\PropertyInterface) {
+                        if ($item->getNativeValue() === null) {
+                            $this->transport->deleteProperty($path);
+                        } else {
+                            $this->transport->storeProperty($path, $item);
+                        }
+                    } else {
+                        throw new \UnexpectedValueException('Unknown type '.get_class($item));
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            $this->transport->rollback();
+            throw $e;
+        }
+        $this->transport->commit();
 
         // commit changes to the local state
         foreach($this->itemsRemove as $path => $dummy) {
