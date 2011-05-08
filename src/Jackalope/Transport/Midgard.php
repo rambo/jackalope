@@ -42,21 +42,35 @@ class Midgard implements TransportInterface
     }
 
     /**
-     * Get the registered namespaces mappings from Midgard2.
-     * By default this includes the 'mgd' namespace. For
-     * registering others, please see the "MgdSchemaRDF" 
-     * specification.
+     * Pass the node type manager into the transport to be used for validation and such.
      *
-     * @return array Associative array of prefix => uri
+     * @param NodeTypeManager $nodeTypeManager
+     * @return void
      *
-     * @throws \PHPCR\RepositoryException if not logged in
-     */
-    public function getNamespaces()
+    public function setNodeTypeManager(NodeTypeManager $nodeTypeManager)
     {
-        return array
-        (
-            'mgd' => 'http://www.midgard-project.org/repligard/1.4'
-        );
+    }*/
+
+    /**
+     * Get the repository descriptors from Midgard2
+     * This happens without login or accessing a specific workspace.
+     *
+     * @return Array with name => Value for the descriptors
+     * @throws \PHPCR\RepositoryException if error occurs
+     */
+    public function getRepositoryDescriptors()
+    {
+        return array();
+    }
+
+    /**
+     * Returns the workspace names that can be used when logging in.
+     *
+     * @return array List of workspaces that can be specified on login
+     */
+    public function getAccessibleWorkspaceNames()
+    {
+        return array();
     }
 
     /**
@@ -77,15 +91,21 @@ class Midgard implements TransportInterface
     }
 
     /**
-     * Get the repository descriptors from Midgard2
-     * This happens without login or accessing a specific workspace.
+     * Get the registered namespaces mappings from Midgard2.
+     * By default this includes the 'mgd' namespace. For
+     * registering others, please see the "MgdSchemaRDF" 
+     * specification.
      *
-     * @return Array with name => Value for the descriptors
-     * @throws \PHPCR\RepositoryException if error occurs
+     * @return array Associative array of prefix => uri
+     *
+     * @throws \PHPCR\RepositoryException if not logged in
      */
-    public function getRepositoryDescriptors()
+    public function getNamespaces()
     {
-        return array();
+        return array
+        (
+            'mgd' => 'http://www.midgard-project.org/repligard/1.4'
+        );
     }
 
     protected function getRootObject($workspacename)
@@ -222,7 +242,7 @@ class Midgard implements TransportInterface
      *
      * @throws \PHPCR\RepositoryException if not logged in
      */
-    public function getNode($path)
+    public function getItem($path)
     {
         $node = new \StdClass();
         $object = $this->getObjectByPath($path);
@@ -264,5 +284,80 @@ class Midgard implements TransportInterface
     {
         throw new \PHPCR\ItemNotFoundException("Not found");
         // TODO: Implement with get_by_guid
-    }    
+    }
+
+    public function getBinaryProperty($path)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function copyNode($srcAbsPath, $dstAbsPath, $srcWorkspace = null)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function moveNode($srcAbsPath, $dstAbsPath)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function deleteNode($path)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function deleteProperty($path)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function storeNode($path, $properties, $children)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function storeProperty($path, \PHPCR\PropertyInterface $property)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function getNodeTypes($nodeTypes = array())
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function registerNodeTypesCnd($cnd, $allowUpdate)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function registerNodeTypes($types, $allowUpdate)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function querySQL($query, $limit = null, $offset = null)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function checkinItem($path)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function checkoutItem($path)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function restoreItem($removeExisting, $versionPath, $path)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function getVersionHistory($path)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
 }

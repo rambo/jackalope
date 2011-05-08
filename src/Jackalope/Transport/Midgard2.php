@@ -27,7 +27,7 @@
  * @subpackage transport
  */
 
-require('midgard.php');
+namespace Jackalope\Transport;
 
 class Midgard2 extends Midgard
 {
@@ -114,7 +114,7 @@ class Midgard2 extends Midgard
             {
                 continue;
             }
-            $mgdschemas[$include_views][] = $refclass->getName();
+            $mgdschemas[] = $refclass->getName();
         }
         return $mgdschemas;
     }
