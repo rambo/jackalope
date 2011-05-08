@@ -1,6 +1,8 @@
 <?php
 /**
- * Class to handle the communication between Jackalope and the Midgard2 Content Repository via php5-midgard2.
+ * Class to handle the communication between Jackalope and the Midgard1 (Ragnaroek) Content Repository via php5-midgard.
+ *
+ * TODO: Doublecheck the config api with regards to Ragna
  *
  * To use this transport you have to have a Midgard2 configuration
  * file (see http://www.midgard-project.org/documentation/unified-configuration/).
@@ -29,7 +31,7 @@
 
 require('midgard.php');
 
-class Midgard2 extends Midgard
+class Midgard1 extends Midgard
 {
 
     /**
@@ -99,6 +101,8 @@ class Midgard2 extends Midgard
 
     protected function getTypes()
     {
+        // TODO: rewrite for ragna
+        /*
         $mgdschemas = array();
         $re = new \ReflectionExtension('midgard2');
         $classes = $re->getClasses();
@@ -117,6 +121,7 @@ class Midgard2 extends Midgard
             $mgdschemas[$include_views][] = $refclass->getName();
         }
         return $mgdschemas;
+        */
     }
 
 }
