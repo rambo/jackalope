@@ -27,7 +27,7 @@
  * @subpackage transport
  */
 
-require('midgard.php');
+namespace Jackalope\Transport;
 
 class Midgard2 extends Midgard
 {
