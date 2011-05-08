@@ -184,6 +184,11 @@ class Midgard implements TransportInterface
         $children = $this->getChildren($object);
         foreach ($children as $child)
         {
+            // TODO: Better checks via midgard reflection ?
+            if (!\property_exists($child, 'name'))
+            {
+                continue;
+            }
             if ($child->name == $name)
             {
                 return $child;
