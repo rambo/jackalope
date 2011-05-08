@@ -89,39 +89,30 @@ class Midgard1 extends Midgard
         return true;
     }
 
+    /**
+     * Via JCR we normally expose only the topic tree, other types will be under "unfiled" later
+     */
     protected function getRootObjects()
     {
-        // TODO: Support all MgdSchema rootlevel types
-        $q = new \midgard_query_select(new \midgard_query_storage('midgardmvc_core_node'));
-        $q->set_constraint(new \midgard_query_constraint(new \midgard_query_property('up'), '=', new \midgard_query_value(0)));
-        $q->execute();
-        return $q->list_objects();
+        $qb = new \midgard_query_builder('midgard_topic');
+        $qb->add_constraint('up', '=', 0);
+        $results = $qb->execute();
+        unset($qb);
+        return $results;
     }
-
 
     protected function getTypes()
     {
-        // TODO: rewrite for ragna
-        /*
         $mgdschemas = array();
-        $re = new \ReflectionExtension('midgard2');
-        $classes = $re->getClasses();
-        foreach ($classes as $refclass)
+        foreach ($_MIDGARD['schema']['types'] as $schema_type => $dummy)
         {
-            $parent_class = $refclass->getParentClass();
-            if (!$parent_class)
+            if (substr($schema_type, 0, 2) == '__')
             {
                 continue;
             }
-
-            if ($parent_class->getName() != 'midgard_object')
-            {
-                continue;
-            }
-            $mgdschemas[$include_views][] = $refclass->getName();
+            $mgdschemas[] = $schema_type;
         }
         return $mgdschemas;
-        */
     }
 
 }
