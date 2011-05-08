@@ -41,6 +41,12 @@ class Midgard2 implements TransportInterface
         $this->midgard2Connect();
     }
 
+    /**
+     * Connects to the midgard2 repository as specified in the php.ini file
+     *
+     * @return \midgard_connection instance
+     * @throws \PHPCR\RepositoryException if error occurs
+     */
     private function midgard2Connect()
     {
         $filepath = ini_get('midgard.configuration_file');
@@ -70,6 +76,42 @@ class Midgard2 implements TransportInterface
         (
             'mgd' => 'http://www.midgard-project.org/repligard/1.4'
         );
+    }
+
+    /**
+     * Set this transport to a specific credential and a workspace.
+     *
+     *
+     * @param \PHPCR\CredentialsInterface the credentials to connect with the backend
+     * @param workspaceName The workspace name to connect to.
+     * @return true on success (exceptions on failure)
+     *
+     * @throws \PHPCR\LoginException if authentication or authorization (for the specified workspace) fails
+     * @throws \PHPCR\NoSuchWorkspacexception if the specified workspaceName is not recognized
+     * @throws \PHPCR\RepositoryException if another error occurs
+     * @see \Jackalope\TransportInterface::login()
+     */
+    public function login(\PHPCR\CredentialsInterface $credentials, $workspaceName)
+    {
+        // TODO: Handle different authtypes
+        $tokens = array
+        (
+            'login' => $credentials->getUserID(),
+            'password' => $credentials->getPassword(),
+            'authtype' => 'Plaintext',
+            'active' => true
+        );
+        try
+        {
+            $user = new \midgard_user($tokens);
+            $user->login();
+        }
+        catch (\midgard_error_exception $e)
+        {
+            throw new \PHPCR\LoginException($e->getMessage());
+        }
+
+        return true;
     }
 
     /**
