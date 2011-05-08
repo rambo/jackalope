@@ -38,7 +38,7 @@ class Midgard2 extends Midgard
      * @return \midgard_connection instance
      * @throws \PHPCR\RepositoryException if error occurs
      */
-    private function midgardConnect()
+    protected function midgardConnect()
     {
         $filepath = ini_get('midgard.configuration_file');
         $config = new \midgard_config();

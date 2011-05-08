@@ -34,7 +34,7 @@ use Jackalope\TransportInterface;
 use PHPCR\RepositoryException;
 use Jackalope\Helper;
 
-class Midgard implements TransportInterface
+abstract class Midgard implements TransportInterface
 {
     public function __construct()
     {
