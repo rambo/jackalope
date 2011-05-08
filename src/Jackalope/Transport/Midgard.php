@@ -225,6 +225,8 @@ abstract class Midgard implements TransportInterface
             }
             return \PHPCR\PropertyType::STRING;
         }
+        
+        // TODO: Handle link fields as refs/weakrefs
 
         return \PHPCR\PropertyType::UNDEFINED;
     }
@@ -256,6 +258,10 @@ abstract class Midgard implements TransportInterface
         $children = $this->getChildren($object);
         foreach ($children as $child)
         {
+            if (!\property_exists($child, 'name'))
+            {
+                continue;
+            }
             if (!$child->name)
             {
                 continue;
