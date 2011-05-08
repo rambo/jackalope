@@ -287,26 +287,33 @@ abstract class Midgard implements TransportInterface
         {
             throw new \PHPCR\ItemNotFoundException($e->getMessage());
         }
-        // TODO: Figure out the prefix for the absolute path
         return $this->getPathForMidgardObject($object);
-        
     }
 
     /**
      * Resolve objects path.
      */
-    abstract function getPathForMidgardObject(&$object);
-
-    protected function getPathForMidgardObject_parentrecursor(&$object)
+    function getPathForMidgardObject(&$object)
     {
         $parts = array();
         $parts[] = $object->name;
-        // TODO: Do we need to check for midgard exceptions in case midgard2 throws them ?
-        while ($parent = $object->get_parent())
+        while (true)
         {
+            try
+            {
+                $parent = $object->get_parent();
+                if (!$parent)
+                {
+                    break;
+                }
+            }
+            catch (\midgard_error_exception $e)
+            {
+                break;
+            }
             $parts[] = $parent->name;
         }
-        $ret = implode('/', array_reverse($parts));
+        $ret = '/' . implode('/', array_reverse($parts));
         unset($parts);
         return $ret;
     }

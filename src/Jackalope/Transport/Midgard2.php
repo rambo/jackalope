@@ -90,7 +90,7 @@ class Midgard2 extends Midgard
     protected function getPathForMidgardObject(&$object)
     {
         // TODO: When get_path() works use that
-        return $this->getPathForMidgardObject_parentrecursor($object);
+        return parent::getPathForMidgardObject($object);
     }
 
 
