@@ -42,16 +42,6 @@ abstract class Midgard implements TransportInterface
     }
 
     /**
-     * Pass the node type manager into the transport to be used for validation and such.
-     *
-     * @param NodeTypeManager $nodeTypeManager
-     * @return void
-     *
-    public function setNodeTypeManager(NodeTypeManager $nodeTypeManager)
-    {
-    }*/
-
-    /**
      * Get the repository descriptors from Midgard2
      * This happens without login or accessing a specific workspace.
      *
@@ -108,7 +98,7 @@ abstract class Midgard implements TransportInterface
         );
     }
 
-    protected function getRootObject($workspacename)
+    protected function getRootObject($workspacename = '')
     {
         $rootnodes = $this->getRootObjects();
         if (empty($rootnodes))
@@ -159,7 +149,7 @@ abstract class Midgard implements TransportInterface
                     continue;
                 }
 
-                if ($link_class == $parent_class)
+                if ($link_class == $midgard_class)
                 {
                     $child_types[] = $mgdschema;
                 }
@@ -220,7 +210,7 @@ abstract class Midgard implements TransportInterface
         {
             $reflectors[$class] = new \midgard_reflection_property($class);
         }
-        $type = $reflector->get_midgard_type($property);
+        $type = $reflectors[$class]->get_midgard_type($property);
    
         if ($type == MGD_TYPE_STRING)
         {
@@ -242,7 +232,7 @@ abstract class Midgard implements TransportInterface
      *
      * @throws \PHPCR\RepositoryException if not logged in
      */
-    public function getItem($path)
+    public function getNode($path)
     {
         $node = new \StdClass();
         $object = $this->getObjectByPath($path);
@@ -271,6 +261,11 @@ abstract class Midgard implements TransportInterface
         return $node;
     }
 
+    public function getProperty($path)
+    {
+        throw new \PHPCR\ItemNotFoundException("Not found");
+    }
+
     /**
      * Get the node path from a JCR uuid
      *
@@ -286,12 +281,17 @@ abstract class Midgard implements TransportInterface
         // TODO: Implement with get_by_guid
     }
 
-    public function getBinaryProperty($path)
+    public function getBinaryStream($path)
     {
         throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
     }
 
     public function copyNode($srcAbsPath, $dstAbsPath, $srcWorkspace = null)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    public function cloneFrom($srcWorkspace, $srcAbsPath, $destAbsPath, $removeExisting)
     {
         throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
     }
@@ -311,14 +311,24 @@ abstract class Midgard implements TransportInterface
         throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
     }
 
-    public function storeNode($path, $properties, $children)
+    public function storeNode(\PHPCR\NodeInterface $node)
     {
         throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
     }
 
-    public function storeProperty($path, \PHPCR\PropertyInterface $property)
+    public function storeProperty(\PHPCR\PropertyInterface $property)
     {
         throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    /**
+     * Pass the node type manager into the transport to be used for validation and such.
+     *
+     * @param NodeTypeManager $nodeTypeManager
+     * @return void
+     */
+    public function setNodeTypeManager($nodeTypeManager)
+    {
     }
 
     public function getNodeTypes($nodeTypes = array())
@@ -336,7 +346,7 @@ abstract class Midgard implements TransportInterface
         throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
     }
 
-    public function querySQL($query, $limit = null, $offset = null)
+    public function query(\PHPCR\Query\QueryInterface $query)
     {
         throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
     }
