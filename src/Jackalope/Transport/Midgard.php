@@ -60,7 +60,7 @@ abstract class Midgard implements TransportInterface
      */
     public function getAccessibleWorkspaceNames()
     {
-        return array();
+        return array('tests');
     }
 
     /**
@@ -77,6 +77,10 @@ abstract class Midgard implements TransportInterface
      */
     public function login(\PHPCR\CredentialsInterface $credentials, $workspaceName)
     {
+        if (!in_array($workspaceName, $this->getAccessibleWorkspaceNames()))
+        {
+            throw new \PHPCR\NoSuchWorkspaceException("Workspace {$workspaceName} not defined");
+        }  
         return $this->midgardLogin($credentials, $workspaceName);
     }
 
