@@ -114,7 +114,7 @@ class Midgard2 extends Midgard
             {
                 continue;
             }
-            $mgdschemas[$include_views][] = $refclass->getName();
+            $mgdschemas[] = $refclass->getName();
         }
         return $mgdschemas;
     }
