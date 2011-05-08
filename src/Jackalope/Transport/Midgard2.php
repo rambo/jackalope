@@ -2,6 +2,14 @@
 /**
  * Class to handle the communication between Jackalope and the Midgard2 Content Repository via php5-midgard2.
  *
+ * To use this transport you have to have a Midgard2 configuration
+ * file (see http://www.midgard-project.org/documentation/unified-configuration/).
+ * Point the transport to correct configuration file by having its path
+ * available in the PHP INI file midgard.configuration_file key. 
+ * For example:
+ *
+ *     midgard.configuration_file = "/home/bergie/.midgard2/midgard2.conf"
+ *
  * @license http://www.apache.org/licenses/LICENSE-2.0  Apache License Version 2.0, January 2004
  *   Licensed under the Apache License, Version 2.0 (the "License") {}
  *   you may not use this file except in compliance with the License.
@@ -28,6 +36,24 @@ use Jackalope\Helper;
 
 class Midgard2 implements TransportInterface
 {
+    public function __construct()
+    {
+        $this->midgard2Connect();
+    }
+
+    private function midgard2Connect()
+    {
+        $filepath = ini_get('midgard.configuration_file');
+        $config = new \midgard_config();
+        $config->read_file_at_path($filepath);
+        $mgd = \midgard_connection::get_instance();
+        if (!$mgd->open_config($config))
+        {
+            throw new \PHPCR\RepositoryException($mgd->get_error_string());
+        }
+        return $mgd;
+    }
+
     /**
      * Get the registered namespaces mappings from Midgard2.
      * By default this includes the 'mgd' namespace. For
