@@ -43,14 +43,12 @@ class Midgard1 extends Midgard
     private function midgardConnect()
     {
         $filepath = ini_get('midgard.configuration_file');
-        $config = new \midgard_config();
-        $config->read_file_at_path($filepath);
-        $mgd = \midgard_connection::get_instance();
-        if (!$mgd->open_config($config))
+        $cnc = new midgard_connection();
+        if (!$cnc->open($filepath))
         {
-            throw new \PHPCR\RepositoryException($mgd->get_error_string());
+            throw new \PHPCR\RepositoryException(midgard_connection::get_error_string());
         }
-        return $mgd;
+        return $cnc;
     }
 
     /**
@@ -58,7 +56,7 @@ class Midgard1 extends Midgard
      *
      *
      * @param \PHPCR\CredentialsInterface the credentials to connect with the backend
-     * @param workspaceName The workspace name to connect to.
+     * @param workspaceName The Midgard sitegroup to connect to.
      * @return true on success (exceptions on failure)
      *
      * @throws \PHPCR\LoginException if authentication or authorization (for the specified workspace) fails
@@ -68,18 +66,20 @@ class Midgard1 extends Midgard
      */
     public function midgardLogin(\PHPCR\CredentialsInterface $credentials, $workspaceName)
     {
-        // TODO: Handle different authtypes
-        $tokens = array
-        (
-            'login' => $credentials->getUserID(),
-            'password' => $credentials->getPassword(),
-            'authtype' => 'Plaintext',
-            'active' => true
-        );
         try
         {
-            $user = new \midgard_user($tokens);
-            $user->login();
+            if (!midgard_connection::set_sitegroup($workspaceName))
+            {
+                throw new \PHPCR\RepositoryException(midgard_connection::get_error_string());
+            }
+        }
+        catch (\midgard_error_exception $e)
+        {
+            throw new \PHPCR\RepositoryException($e->getMessage());
+        }
+        try
+        {
+            $user = midgard_user::auth($credentials->getUserID(), $credentials->getPassword(), $workspaceName);
         }
         catch (\midgard_error_exception $e)
         {
@@ -98,7 +98,7 @@ class Midgard1 extends Midgard
         $qb->add_constraint('up', '=', 0);
         $results = $qb->execute();
         unset($qb);
-        return $results;
+        return $results;
     }
 
     protected function getTypes()
