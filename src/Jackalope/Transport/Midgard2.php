@@ -182,6 +182,27 @@ class Midgard2 implements TransportInterface
         return $object;
     }
 
+    private function getPropertyType($class, $property)
+    {
+        static $reflectors = array();
+        if (!isset($reflectors[$class]))
+        {
+            $reflectors[$class] = new \midgard_reflection_property($class);
+        }
+        $type = $reflector->get_midgard_type($property);
+   
+        if ($type == MGD_TYPE_STRING)
+        {
+            if ($property == 'name')
+            {
+                return \PHPCR\PropertyType::PATH;
+            }
+            return \PHPCR\PropertyType::STRING;
+        }
+
+        return \PHPCR\PropertyType::UNDEFINED;
+    }
+
     /**
      * Get the node that is stored at an absolute path
      *
@@ -192,7 +213,7 @@ class Midgard2 implements TransportInterface
      */
     public function getNode($path)
     {
-        $node = array();
+        $node = new \StdClass();
         $object = $this->getObjectByPath($path);
         if (!$object)
         {
@@ -202,8 +223,21 @@ class Midgard2 implements TransportInterface
         $props = get_object_vars($object);
         foreach ($props as $property => $value)
         {
-            $node[$property] = $value;
+            $node->{$property} = $value;
+            $node->{':' . $property} = $this->getPropertyType(get_class($object), $property);
         }
+
+        $children = $this->getChildren($object);
+        foreach ($children as $child)
+        {
+            if (!$child->name)
+            {
+                continue;
+            }
+            $node->{$child->name} = new \StdClass();
+        }
+
+        return $node;
     }
 
     /**
