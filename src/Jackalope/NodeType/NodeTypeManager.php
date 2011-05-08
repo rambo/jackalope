@@ -324,8 +324,7 @@ class NodeTypeManager implements \IteratorAggregate, \PHPCR\NodeType\NodeTypeMan
             $nts[$definition->getName()] = $this->createNodeType($definition, $allowUpdate);
         }
 
-        // FIXME: broken
-        $this->objectManager->registerNodeTypes($definitions);
+        $this->objectManager->registerNodeTypes($definitions, $allowUpdate);
 
         // no need to fetch the node types as with cnd, we already have the def and can
         // now register them ourselves
@@ -376,7 +375,7 @@ class NodeTypeManager implements \IteratorAggregate, \PHPCR\NodeType\NodeTypeMan
 
         //parse out type names and fetch types to return definitions of the new nodes
         preg_match_all('/\[([^\]]*)\]/', $cnd, $names);
-        foreach($names[1] as $name) {
+        foreach ($names[1] as $name) {
             $types[$name] = $this->getNodeType($name);
         }
         $this->fetchedAllFromBackend = $fetched;
