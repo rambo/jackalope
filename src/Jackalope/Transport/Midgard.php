@@ -34,30 +34,11 @@ use Jackalope\TransportInterface;
 use PHPCR\RepositoryException;
 use Jackalope\Helper;
 
-class Midgard2 implements TransportInterface
+class Midgard implements TransportInterface
 {
     public function __construct()
     {
-        $this->midgard2Connect();
-    }
-
-    /**
-     * Connects to the midgard2 repository as specified in the php.ini file
-     *
-     * @return \midgard_connection instance
-     * @throws \PHPCR\RepositoryException if error occurs
-     */
-    private function midgard2Connect()
-    {
-        $filepath = ini_get('midgard.configuration_file');
-        $config = new \midgard_config();
-        $config->read_file_at_path($filepath);
-        $mgd = \midgard_connection::get_instance();
-        if (!$mgd->open_config($config))
-        {
-            throw new \PHPCR\RepositoryException($mgd->get_error_string());
-        }
-        return $mgd;
+        $this->midgardConnect();
     }
 
     /**
@@ -79,8 +60,7 @@ class Midgard2 implements TransportInterface
     }
 
     /**
-     * Set this transport to a specific credential and a workspace.
-     *
+     * Set this transport to a specific credential and a workspace. proxies to midgardLogin method that subclasses will implement
      *
      * @param \PHPCR\CredentialsInterface the credentials to connect with the backend
      * @param workspaceName The workspace name to connect to.
@@ -93,25 +73,7 @@ class Midgard2 implements TransportInterface
      */
     public function login(\PHPCR\CredentialsInterface $credentials, $workspaceName)
     {
-        // TODO: Handle different authtypes
-        $tokens = array
-        (
-            'login' => $credentials->getUserID(),
-            'password' => $credentials->getPassword(),
-            'authtype' => 'Plaintext',
-            'active' => true
-        );
-        try
-        {
-            $user = new \midgard_user($tokens);
-            $user->login();
-        }
-        catch (\midgard_error_exception $e)
-        {
-            throw new \PHPCR\LoginException($e->getMessage());
-        }
-
-        return true;
+        return $this->midgardLogin($credentials, $workspaceName);
     }
 
     /**
@@ -126,7 +88,7 @@ class Midgard2 implements TransportInterface
         return array();
     }
 
-    private function getRootObject($workspacename)
+    protected function getRootObject($workspacename)
     {
         $rootnodes = $this->getRootObjects();
         if (empty($rootnodes))
@@ -135,39 +97,20 @@ class Midgard2 implements TransportInterface
         }
         return $rootnodes[0];
     }
-    
-    private function getRootObjects()
+
+    protected function getRootObjects()
     {
-        // TODO: Support all MgdSchema rootlevel types
-        $q = new \midgard_query_select(new \midgard_query_storage('midgardmvc_core_node'));
-        $q->set_constraint(new \midgard_query_constraint(new \midgard_query_property('up'), '=', new \midgard_query_value(0)));
-        $q->execute();
-        return $q->list_objects();
+        // TODO: Use NotImplementedException or something ?
+        throw new Exception('Must be implemented in a subclass');
     }
 
-    private function getTypes()
+    protected function getTypes()
     {
-        $mgdschemas = array();
-        $re = new \ReflectionExtension('midgard2');
-        $classes = $re->getClasses();
-        foreach ($classes as $refclass)
-        {
-            $parent_class = $refclass->getParentClass();
-            if (!$parent_class)
-            {
-                continue;
-            }
-
-            if ($parent_class->getName() != 'midgard_object')
-            {
-                continue;
-            }
-            $mgdschemas[$include_views][] = $refclass->getName();
-        }
-        return $mgdschemas;
+        // TODO: Use NotImplementedException or something ?
+        throw new Exception('Must be implemented in a subclass');
     }
 
-    private function getChildTypes($midgard_class)
+    protected function getChildTypes($midgard_class)
     {
         $mgdschemas = $this->getTypes();
         $child_types = array();
@@ -205,7 +148,7 @@ class Midgard2 implements TransportInterface
         return $child_types;
     }
 
-    private function getChildren(\midgard_object $object)
+    protected function getChildren(\midgard_object $object)
     {
         $children = array();
         $childTypes = $this->getChildTypes(get_class($object));
@@ -216,7 +159,7 @@ class Midgard2 implements TransportInterface
         return $children;        
     }
 
-    private function getChild(\midgard_object $object, $name)
+    protected function getChild(\midgard_object $object, $name)
     {
         $children = $this->getChildren($object);
         foreach ($children as $child)
@@ -229,7 +172,7 @@ class Midgard2 implements TransportInterface
         return false;
     }
     
-    private function getObjectByPath($path)
+    protected function getObjectByPath($path)
     {
         static $objects_by_path;
         $object = $this->getRootObject();
@@ -250,7 +193,7 @@ class Midgard2 implements TransportInterface
         return $object;
     }
 
-    private function getPropertyType($class, $property)
+    protected function getPropertyType($class, $property)
     {
         static $reflectors = array();
         if (!isset($reflectors[$class]))
