@@ -87,6 +87,13 @@ class Midgard2 extends Midgard
         return true;
     }
 
+    protected function getPathForMidgardObject(&$object)
+    {
+        // TODO: When get_path() works use that
+        return $this->getPathForMidgardObject_parentrecursor($object);
+    }
+
+
     protected function getRootObjects()
     {
         // TODO: Support all MgdSchema rootlevel types

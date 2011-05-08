@@ -101,6 +101,11 @@ class Midgard1 extends Midgard
         return $results;
     }
 
+    protected function getPathForMidgardObject(&$object)
+    {
+        return $this->getPathForMidgardObject_parentrecursor($object);
+    }
+
     protected function getTypes()
     {
         $mgdschemas = array();

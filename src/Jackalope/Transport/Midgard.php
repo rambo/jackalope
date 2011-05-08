@@ -287,8 +287,40 @@ class Midgard implements TransportInterface
      */
     public function getNodePathForIdentifier($uuid)
     {
-        throw new \PHPCR\ItemNotFoundException("Not found");
         // TODO: Implement with get_by_guid
+        try
+        {
+            $object = midgard_object_class::get_object_by_guid($guid);
+        }
+        catch (\midgard_error_exception $e)
+        {
+            throw new \PHPCR\ItemNotFoundException($e->getMessage());
+        }
+        // TODO: Figure out the prefix for the absolute path
+        return $this->getPathForMidgardObject($object);
+        
+    }
+
+    /**
+     * Resolve objects path.
+     */
+    function getPathForMidgardObject(&$object)
+    {
+        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
+    }
+
+    protected function getPathForMidgardObject_parentrecursor(&$object)
+    {
+        $parts = array();
+        $parts[] = $object->name;
+        // TODO: Do we need to check for midgard exceptions in case midgard2 throws them ?
+        while ($parent = $object->get_parent())
+        {
+            $parts[] = $parent->name;
+        }
+        $ret = implode('/', array_reverse($parts));
+        unset($parts);
+        return $ret;
     }
 
     public function getBinaryProperty($path)
