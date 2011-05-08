@@ -23,6 +23,7 @@
 namespace Jackalope\Transport\Davex;
 use Jackalope\Transport\curl;
 use Jackalope\TransportInterface;
+use Jackalope\NotImplementedException;
 use DOMDocument;
 use Jackalope\NodeType\NodeTypeManager;
 
@@ -313,16 +314,14 @@ class Client implements TransportInterface
     }
 
     /**
-     * Get the item from an absolute path
+     * Get the node from an absolute path
      *
-     * TODO: should we call this getNode? does not work for property. (see ObjectManager::getPropertyByPath for more on properties)
-     *
-     * @param string $path Absolute path to identify a special item.
-     * @return array for the node (decoded from json)
+     * @param string $path Absolute path to the node.
+     * @return array associative array for the node (decoded from json with associative = true)
      *
      * @throws \PHPCR\RepositoryException if not logged in
      */
-    public function getItem($path)
+    public function getNode($path)
     {
         $this->ensureAbsolutePath($path);
 
@@ -333,15 +332,38 @@ class Client implements TransportInterface
     }
 
     /**
+     * Get the property stored at an absolute path.
+     *
+     * Same format as getNode with just one property.
+     *
+     * @return array associative array with the property value.
+     */
+    public function getProperty($path)
+    {
+        throw new NotImplementedException();
+        /*
+         * TODO: implement
+         * jackrabbit: instead of fetching the node, we could make Transport provide it with a
+         * GET /server/tests/jcr%3aroot/tests_level1_access_base/multiValueProperty/jcr%3auuid
+         * (davex getItem uses json, which is not applicable to properties)
+         */
+    }
+
+    /**
      * Retrieves a binary value
      *
      * @param $path
      * @return string
      */
-    public function getBinaryProperty($path)
+    public function getBinaryStream($path)
     {
         $request = $this->getRequest(Request::GET, $path);
-        return $request->execute();
+        //OPTIMIZE!
+        $binary = $request->execute();
+        $stream = fopen('php://memory');
+        fwrite($stream, $binary);
+        fseek($stream, 0);
+        return $stream;
     }
 
     /**
@@ -424,6 +446,8 @@ class Client implements TransportInterface
 
     public function querySQL($query, $limit = null, $offset = null)
     {
+        //FIXME: refactor this to use query and not querySQL
+
         $body ='<D:searchrequest xmlns:D="DAV:"><JCR-SQL2><![CDATA['.$query.']]></JCR-SQL2>';
 
         if (null !== $limit || null !== $limit) {
@@ -444,6 +468,12 @@ class Client implements TransportInterface
         $request->setBody($body);
         return $request->execute();
     }
+
+    public function query(\PHPCR\Query\QueryInterface $query)
+    {
+        throw new NotImplementedException();
+    }
+
 
     /**
      * checks if the path is absolute, throws an exception if it is not
@@ -554,26 +584,31 @@ class Client implements TransportInterface
         $request->execute();
     }
 
+    public function cloneFrom($srcWorkspace, $srcAbsPath, $destAbsPath, $removeExisting)
+    {
+        throw new NotImplementedException();
+    }
+
+
     /**
      * Recursively store a node and its children to the given absolute path.
      *
      * The basename of the path is the name of the node
      *
-     * @param string $path Absolute path to the node, name is part after last /
-     * @param \PHPCR\NodeType\NodeTypeInterface $primaryType FIXME: would we need this?
-     * @param \Traversable $properties array of \PHPCR\PropertyInterface objects
-     * @param \Traversable $children array of \PHPCR\NodeInterface objects
+     * @param NodeInterface $node
+     *
      * @return bool true on success
      *
      * @throws \PHPCR\RepositoryException if not logged in
      */
-    public function storeNode($path, $properties, $children)
+    public function storeNode(\PHPCR\NodeInterface $node)
     {
+        $path = $node->getPath();
         $this->ensureAbsolutePath($path);
 
         $buffer = array();
         $body = '<?xml version="1.0" encoding="UTF-8"?>';
-        $body .= $this->createNodeMarkup($path, $properties, $children, $buffer);
+        $body .= $this->createNodeMarkup($path, $node->getProperties(), $node->getNodes(), $buffer);
 
         $request = $this->getRequest(Request::MKCOL, $path);
         $request->setBody($body);
@@ -605,7 +640,7 @@ class Client implements TransportInterface
 
         foreach ($properties as $name => $property) {
             $type = \PHPCR\PropertyType::nameFromValue($property->getType());
-            $nativeValue = $property->getNativeValue();
+            $nativeValue = $property->getValue();
             $valueBody = '';
             // handle multivalue properties
             if (is_array($nativeValue)) {
@@ -644,14 +679,15 @@ class Client implements TransportInterface
      *
      * @throws \PHPCR\RepositoryException if not logged in
      */
-    public function storeProperty($path, \PHPCR\PropertyInterface $property)
+    public function storeProperty(\PHPCR\PropertyInterface $property)
     {
+        $path = $property->getPath();
         $this->ensureAbsolutePath($path);
 
         $type = \PHPCR\PropertyType::nameFromValue($property->getType());
 
         $request = $this->getRequest(Request::PUT, $path);
-        $nativeValue = $property->getNativeValue();
+        $nativeValue = $property->getValue();
         if ($property->getName() === 'jcr:mixinTypes') {
             $uri = $this->normalizeUri(dirname($path) === '\\' ? '/' : dirname($path));
             $request->setUri($uri);
@@ -779,8 +815,9 @@ class Client implements TransportInterface
 
     /**
      * Returns node types as array structure
-     * 
+     *
      * @param array nodetypes to request
+     *
      * @return array a list of nodetype definitions
      * @throws \PHPCR\RepositoryException if not logged in
      */
@@ -800,7 +837,6 @@ class Client implements TransportInterface
 
         return $this->typeXmlConverter->getNodeTypesFromXml($dom);
     }
-
 
     /**
      * Register namespaces and new node types or update node types based on a
@@ -829,7 +865,7 @@ class Client implements TransportInterface
      */
     public function registerNodeTypes($types, $allowUpdate)
     {
-        throw new \Jackalope\NotImplementedException('TODO: convert node type definition to cnd format and call registerNodeTypesCnd');
+        throw new NotImplementedException('TODO: convert node type definition to cnd format and call registerNodeTypesCnd');
         //see http://jackrabbit.apache.org/node-type-notation.html
     }
 
@@ -922,7 +958,7 @@ class Client implements TransportInterface
         return substr($uri,strlen($this->workspaceUriRoot));
     }
 
-    public function setNodeTypeManager(NodeTypeManager $nodeTypeManager)
+    public function setNodeTypeManager($nodeTypeManager)
     {
         $this->nodeTypeManager = $nodeTypeManager;
     }
