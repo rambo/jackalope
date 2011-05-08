@@ -40,6 +40,8 @@ abstract class Midgard implements TransportInterface
     {
         $this->midgardConnect();
     }
+    
+    abstract function midgardConnect();
 
     /**
      * Get the repository descriptors from Midgard2
@@ -79,6 +81,8 @@ abstract class Midgard implements TransportInterface
     {
         return $this->midgardLogin($credentials, $workspaceName);
     }
+    
+    abstract function midgardLogin(\PHPCR\CredentialsInterface $credentials, $workspaceName);
 
     /**
      * Get the registered namespaces mappings from Midgard2.
@@ -108,17 +112,9 @@ abstract class Midgard implements TransportInterface
         return $rootnodes[0];
     }
 
-    protected function getRootObjects()
-    {
-        // TODO: Use NotImplementedException or something ?
-        throw new Exception('Must be implemented in a subclass');
-    }
+    abstract protected function getRootObjects();
 
-    protected function getTypes()
-    {
-        // TODO: Use NotImplementedException or something ?
-        throw new Exception('Must be implemented in a subclass');
-    }
+    abstract protected function getTypes();
 
     protected function getChildTypes($midgard_class)
     {
@@ -299,10 +295,7 @@ abstract class Midgard implements TransportInterface
     /**
      * Resolve objects path.
      */
-    function getPathForMidgardObject(&$object)
-    {
-        throw new \PHPCR\UnsupportedRepositoryOperationException("Not supported");
-    }
+    abstract function getPathForMidgardObject(&$object);
 
     protected function getPathForMidgardObject_parentrecursor(&$object)
     {
