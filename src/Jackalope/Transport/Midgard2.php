@@ -87,7 +87,7 @@ class Midgard2 extends Midgard
         return true;
     }
 
-    protected function getPathForMidgardObject(&$object)
+    protected function getPathForMidgardObject($object)
     {
         // TODO: When get_path() works use that
         return parent::getPathForMidgardObject($object);

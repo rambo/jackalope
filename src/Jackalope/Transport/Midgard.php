@@ -76,7 +76,7 @@ abstract class Midgard implements TransportInterface
      * @return true on success (exceptions on failure)
      *
      * @throws \PHPCR\LoginException if authentication or authorization (for the specified workspace) fails
-     * @throws \PHPCR\NoSuchWorkspacexception if the specified workspaceName is not recognized
+     * @throws \PHPCR\NoSuchWorkspaceException if the specified workspaceName is not recognized
      * @throws \PHPCR\RepositoryException if another error occurs
      * @see \Jackalope\TransportInterface::login()
      */
@@ -114,7 +114,7 @@ abstract class Midgard implements TransportInterface
         $rootnodes = $this->getRootObjects($workspacename);
         if (empty($rootnodes))
         {
-            throw new \PHPCR\NoSuchWorkspacexception('No workspaces defined');
+            throw new \PHPCR\NoSuchWorkspaceException('No workspaces defined');
         }
         return $rootnodes[0];
     }
@@ -178,12 +178,12 @@ abstract class Midgard implements TransportInterface
         $children = $this->getChildren($object);
         foreach ($children as $child)
         {
-            // TODO: Better checks via midgard reflection ?
-            if (!\property_exists($child, 'name'))
+            $name_property = $this->getNameProperty($child);
+            if (!$name_property)
             {
                 continue;
             }
-            if ($child->name == $name)
+            if ($child->{$name_property} == $name)
             {
                 return $child;
             }
@@ -212,6 +212,46 @@ abstract class Midgard implements TransportInterface
         return $object;
     }
 
+
+    /**
+     * Deference a midgard link and return array of value and datatype
+     *
+     * @param object $object MgdSchema or midgard_metadata object
+     * @param string $property_name name of the property to dereference
+     * @param midgard_reflection_property $ref already instantiated midgard reflector
+     */
+    protected function dereferenceMgdLink($object, $property_name, $ref)
+    {
+        $ret = array();
+        $type = $ref->get_midgard_type($property_name);
+        $target_class = '\\' . $ref->get_link_name($property_name);
+        $ret[1] = \PHPCR\PropertyType::TYPENAME_WEAKREFERENCE;
+        switch($type)
+        {
+            case MGD_TYPE_UINT:
+                // We suppose this is a link to id so we can instantiate by it
+                try
+                {
+                    $target_object = new $target_class($object->{$property_name});
+                    $ret[0] = $target_object->guid;
+                }
+                catch (\midgard_error_exception $e)
+                {
+                    $ret[0] = '';
+                }
+                break;
+            case MGD_TYPE_STRING:
+            case MGD_TYPE_GUID:
+                // Weakref so don't bother checking if we can instantiate the object
+                $ret[0] = $object->{$property_name};
+                break;
+            default:
+                // Don't know how to deref this type
+                $ret[0] = '';
+                break;
+        }
+    }
+
     /**
      * Get the node that is stored at an absolute path
      *
@@ -228,22 +268,57 @@ abstract class Midgard implements TransportInterface
         {
             throw new \PHPCR\ItemNotFoundException("No object at {$path}");
         }
+        $object_class = get_class($object);
+        $ref =& $this->getMgdschemaReflector($object_class);
 
-        $props = get_object_vars($object);
-        foreach ($props as $property => $value)
+        // Normal properties
+        $properties = $this->getMgdschemaProperties($mgdschema_type);
+        foreach($properties as $property_name)
         {
-            $node->{$property} = $value;
-            $node->{':' . $property} = $this->getPropertyType(get_class($object), $property);
+            if ($ref->is_link($property_name))
+            {
+                $deref = $this->dereferenceMgdLink($object, $property_name, $ref);
+                $node->{$property_name} = $deref[0];
+                $node->{':' . $property_name} = $deref[1];
+                unset($deref);
+            }
+            $node->{$property_name} = $object->{$property_name};
+            $node->{':' . $property_name} = $this->getPropertyType($object_class, $property_name);
         }
+        // MD properties
+        $properties = $this->getMgdschemaProperties('midgard_metadata');
+        $mdref =& $this->getMgdschemaReflector('midgard_metadata');
+        foreach($properties as $property_name)
+        {
+            $jcr_name = "mgd:metadata:{$property_name}";
+            if ($mdref->is_link($property_name))
+            {
+                $deref = $this->dereferenceMgdLink($object->metadata, $property_name, $mdref);
+                $node->{$jcr_name} = $deref[0];
+                $node->{':' . $jcr_name} = $deref[1];
+                unset($deref);
+            }
+            $node->{$jcr_name} = $object->metadata->{$property_name};
+            $node->{':' . $jcr_name} = $this->getPropertyType('midgard_metadata', $property_name);
+        }
+        // GUID is a special case
+        $node->{'jcr:uuid'} = $object->guid;
+        $node->{':jcr:uuid'} = \PHPCR\PropertyType::TYPENAME_STRING;
+        
+        // TODO: handle record extensions
+        
+        //TODO: How to handle JCR primary and mixin types (for example almost all midgard objects are referenceable)
 
         $children = $this->getChildren($object);
         foreach ($children as $child)
         {
-            if (!\property_exists($child, 'name'))
+            // I don't quite understand what is being done here --rambo
+            $name_property = $this->getNameProperty($child);
+            if (!$name_property)
             {
                 continue;
             }
-            if (!$child->name)
+            if (!$child->{$name_property})
             {
                 continue;
             }
@@ -253,9 +328,21 @@ abstract class Midgard implements TransportInterface
         return $node;
     }
 
+    /**
+     * Helper to get a midgard_reflection_property for given mgdschema type
+     *
+     * @param string $mgdschema_type the mgdschema class name
+     * @return reference to the reflector object
+     * @throws \PHPCR\RepositoryException in case of trouble
+     */
     protected function &getMgdschemaReflector($mgdschema_type)
     {
         static $reflectors = array();
+        // Safety against passing an object here
+        if (is_object($mgdschema_type))
+        {
+            $mgdschema_type = \get_class($mgdschema_type);
+        }
         if (isset($reflectors[$mgdschema_type]))
         {
             return $reflectors[$mgdschema_type];
@@ -309,8 +396,72 @@ abstract class Midgard implements TransportInterface
 
         $data['name'] = $mgdschema_type;
         $data['hasOrderableChildNodes'] = true;
+
+
+        $data['declaredPropertyDefinitions'] = array();
+        $properties = $this->getMgdschemaProperties($mgdschema_type);
+        foreach($properties as $property_name)
+        {
+            $data['declaredPropertyDefinitions'][] = $this->getPropertyDefArray($mgdschema_type, $property_name);
+        }
+        // Append metadata properties
+        $properties = $this->getMgdschemaProperties('midgard_metadata');
+        foreach($properties as $property_name)
+        {
+            $data['declaredPropertyDefinitions'][] = $this->getPropertyDefArray($mgdschema_type, $property_name, "mgd:metadata:{$property_name}");
+        }
+        /**
+         * This should be defined by the very base types of JCR itself
+        $data['declaredPropertyDefinitions'][] = array
+        (
+            'name' => 'jcr:uuid',
+            'requiredType' => \PHPCR\PropertyType::TYPENAME_STRING,
+            // TODO: Other defintion
+            
+        );
+        */
+        
+        // TODO: How to specify that we allow adding of arbitary properties (internally handled as midgard_parameter) ??
         
         return $data;
+    }
+
+    /**
+     * Get the list of properties for given MgdSchema type
+     *
+     * @param string $mgdschema_type the mgdschema classname (or object instance)
+     * @return array of the property names (metadata, id and guid properties excluded)
+     */
+    protected function getMgdschemaProperties($mgdschema_type)
+    {
+        static $cache = array();
+        $dummy = $this->getMgdDummyObject($mgdschema_type);
+        $class = get_class($dummy);
+        if (isset($cache[$class]))
+        {
+            return $cache[$class];
+        }
+        $properties = get_object_vars($dummy);
+        // Remove common properties that are handled in special way
+        unset($properties['metadata'], $properties['id'], $properties['guid']);
+
+        // Remove also parent and up links, the proper way is to use the node->getParent() and exposing the references can lead to people using wrong interface
+        $parent_prop = midgard_object_class::get_property_parent($class);
+        if ($parent_prop)
+        {
+            unset($properties[$parent_prop]);
+        }
+        unset($parent_prop);
+        $up_prop = midgard_object_class::get_property_up($class);
+        if ($up_prop)
+        {
+            unset($properties[$up_prop]);
+        }
+        unset($up_prop);
+
+        $cache[$class] = array_keys($properties);
+        unset($dummy, $properties);
+        return $cache[$class];
     }
 
     /**
@@ -320,7 +471,7 @@ abstract class Midgard implements TransportInterface
      * @param string $property_name name of the mgdschema property
      * @return array usable Jackalope\PropertyDefinition::fromArray
      */
-    public function getPropertyDefArray($mgdschema_type, $property_name)
+    public function getPropertyDefArray($mgdschema_type, $property_name, $override_name = false)
     {
         $ref =& $this->getMgdschemaReflector($mgdschema_type);
 /**
@@ -346,9 +497,68 @@ abstract class Midgard implements TransportInterface
 */
 
         $data['name'] = $property_name;
+        if ($override_name)
+        {
+            $data['name'] = $override_name;
+        }
         $data['requiredType'] = $this->getPropertyType($mgdschema_type, $property_name);
         $data['multiple'] = false;
         return $data;
+    }
+
+
+    /**
+     * Get a dummy object usable to get object property list from MgdSchema class name
+     *
+     * @param string $mgdschema_type MgdSchema class name
+     */
+    protected function getMgdDummyObject($mgdschema_type)
+    {
+        static $cache = array();
+        // Prepend namespace in case it's not there
+        if (is_object($mgdschema_type))
+        {
+            $mgdschema_type = get_class($mgdschema_type);
+        }
+        if (   is_string($mgdschema_type)
+            && $mgdschema_type[0] !== '\\')
+        {
+            $mgdschema_type = '\\' . $mgdschema_type;
+        }
+        else
+        {
+            throw new Exception('Got funky argument');
+        }
+        if (isset($cache[$mgdschema_type]))
+        {
+            return $mgdschema_type;
+        }
+        $cache[$mgdschema_type] = new $mgdschema_type();
+        return $cache[$mgdschema_type];
+    }
+
+    /**
+     * Get the name of the property considered the path-name of the object
+     *
+     * @param mixed $mgdschema_type MgdSchema class name or object instance
+     * @return string the name of the property or boolean false if it could not be determined
+     */
+    protected function getNameProperty($mgdschema_type)
+    {
+        static $cache = array();
+        $dummy = $this->getMgdDummyObject($mgdschema_type);
+        $class = get_class($dummy);
+        if (isset($cache[$class]))
+        {
+            return $cache[$class];
+        }
+        if (\property_exists($dummy, 'name'))
+        {
+            $cache[$class] = 'name';
+            return $cache[$class];
+        }
+        $cache[$class] = false;
+        return $cache[$class];
     }
 
     /**
@@ -361,22 +571,49 @@ abstract class Midgard implements TransportInterface
     {
         $ref =& $this->getMgdschemaReflector($mgdschema_type);
         $type = $ref->get_midgard_type($property);
-   
-        if ($type == MGD_TYPE_STRING)
+        
+        // Link property handling
+        if ($ref->is_link($property))
         {
-            // TODO: Any better way to determine the name property ?
-            if ($property == 'name')
-            {
-                return \PHPCR\PropertyType::PATH;
-            }
-            return \PHPCR\PropertyType::STRING;
+            // TODO: Determine whether to use weak or hard reference
+            return \PHPCR\PropertyType::TYPENAME_WEAKREFERENCE;
         }
-        
-        // TODO: Handle link fields as refs/weakrefs
-        
-        // TODO: Handle other mgdschema types
+   
+        switch($type)
+        {
+            case MGD_TYPE_GUID:
+                // Fall-through for now
+            case MGD_TYPE_STRING:
+                if ($property_name === $this->getNameProperty($mgdschema_type))
+                {
+                    return \PHPCR\PropertyType::TYPENAME_PATH;
+                }
+                return \PHPCR\PropertyType::TYPENAME_STRING;
+                break;
 
-        return \PHPCR\PropertyType::UNDEFINED;
+            case MGD_TYPE_BOOLEAN:
+                return \PHPCR\PropertyType::TYPENAME_BOOLEAN;
+                break;
+
+            case MGD_TYPE_INT:
+                return \PHPCR\PropertyType::TYPENAME_LONG;
+                break;
+
+            case MGD_TYPE_UINT:
+                return \PHPCR\PropertyType::TYPENAME_LONG;
+                break;
+
+            case MGD_TYPE_FLOAT:
+                return \PHPCR\PropertyType::TYPENAME_DOUBLE;
+                break;
+
+            case MGD_TYPE_TIMESTAMP:
+                return \PHPCR\PropertyType::TYPENAME_DATE;
+                break;
+
+            default:
+                return \PHPCR\PropertyType::TYPENAME_UNDEFINED;
+        }
     }
 
 
@@ -412,7 +649,7 @@ abstract class Midgard implements TransportInterface
     /**
      * Resolve objects path.
      */
-    protected function getPathForMidgardObject(&$object)
+    protected function getPathForMidgardObject($object)
     {
         $parts = array();
         $parts[] = $object->name;
