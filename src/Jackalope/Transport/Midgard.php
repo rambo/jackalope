@@ -36,9 +36,12 @@ use Jackalope\Helper;
 
 abstract class Midgard implements TransportInterface
 {
-    public function __construct()
+    public function __construct(\midgard_connection $connection = null)
     {
-        $this->midgardConnect();
+        if (!$connection)
+        {
+            $this->midgardConnect();
+        }
     }
 
     /**
