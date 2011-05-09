@@ -28,7 +28,7 @@
             <exclude>
                 <directory>../tests</directory>
                 <directory>.</directory>
-                <file>../src/jackalope/transport/curl.php</file>
+                <file>../src/Jackalope/Transport/curl.php</file>
             </exclude>
         </whitelist>
     </filter>
