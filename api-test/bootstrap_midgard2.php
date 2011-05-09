@@ -1,6 +1,10 @@
 <?php
 require_once(dirname(__FILE__) . '/../src/Jackalope/autoloader.php');
 
+if (!extension_loaded('midgard2')) {
+    die("\nThe Midgard2 Jackalope transport requires 'midgard2' PHP extension to be loaded\n");
+}
+
 if (getenv('MIDGARD_ENV_GLOBAL_SHAREDIR') != '/tmp/JackalopeMidgard2/share')
 {
     die("\nBefore running these tests you need to run 'export MIDGARD_ENV_GLOBAL_SHAREDIR=/tmp/JackalopeMidgard2/share'\n");
