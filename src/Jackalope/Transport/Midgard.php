@@ -129,8 +129,7 @@ abstract class Midgard implements TransportInterface
         $child_types = array();
         foreach ($mgdschemas as $mgdschema)
         {
-            if (   $mgdschema == 'midgard_attachment'
-                || $mgdschema == 'midgard_parameter')
+            if ($mgdschema == 'midgard_parameter')
             {
                 continue;
             }
@@ -165,6 +164,7 @@ abstract class Midgard implements TransportInterface
     protected function getChildren(\midgard_object $object)
     {
         $children = array();
+        array_merge($children, $object->list());
         $childTypes = $this->getChildTypes(get_class($object));
         foreach ($childTypes as $childType)
         {
