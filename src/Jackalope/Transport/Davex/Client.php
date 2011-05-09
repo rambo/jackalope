@@ -21,6 +21,8 @@
  */
 
 namespace Jackalope\Transport\Davex;
+
+use PHPCR\PropertyType;
 use Jackalope\Transport\curl;
 use Jackalope\TransportInterface;
 use Jackalope\NotImplementedException;
@@ -358,11 +360,11 @@ class Client implements TransportInterface
     public function getBinaryStream($path)
     {
         $request = $this->getRequest(Request::GET, $path);
-        //OPTIMIZE!
+        // TODO: OPTIMIZE!
         $binary = $request->execute();
-        $stream = fopen('php://memory');
+        $stream = fopen('php://memory', 'rwb+');
         fwrite($stream, $binary);
-        fseek($stream, 0);
+        rewind($stream);
         return $stream;
     }
 
@@ -444,11 +446,13 @@ class Client implements TransportInterface
         return $resp;
     }
 
-    public function querySQL($query, $limit = null, $offset = null)
+    public function query(\PHPCR\Query\QueryInterface $query)
     {
-        //FIXME: refactor this to use query and not querySQL
+        $querystring = $query->getStatementSql2();
+        $limit = $query->getLimit();
+        $offset = $query->getOffset();
 
-        $body ='<D:searchrequest xmlns:D="DAV:"><JCR-SQL2><![CDATA['.$query.']]></JCR-SQL2>';
+        $body ='<D:searchrequest xmlns:D="DAV:"><JCR-SQL2><![CDATA['.$querystring.']]></JCR-SQL2>';
 
         if (null !== $limit || null !== $limit) {
             $body .= '<D:limit>';
@@ -466,14 +470,28 @@ class Client implements TransportInterface
         $path = $this->normalizeUri('/');
         $request = $this->getRequest(Request::SEARCH, $path);
         $request->setBody($body);
-        return $request->execute();
-    }
 
-    public function query(\PHPCR\Query\QueryInterface $query)
-    {
-        throw new NotImplementedException();
-    }
+        $rawData = $request->execute();
 
+        $dom = new \DOMDocument();
+        $dom->loadXML($rawData);
+
+        $rows = array();
+        foreach ($dom->getElementsByTagName('response') as $row) {
+            $columns = array();
+            foreach ($row->getElementsByTagName('column') as $column) {
+                $sets = array();
+                foreach ($column->childNodes as $childNode) {
+                    $sets[$childNode->tagName] = $childNode->nodeValue;
+                }
+
+                $columns[] = $sets;
+            }
+
+            $rows[] = $columns;
+        }
+        return $rows;
+    }
 
     /**
      * checks if the path is absolute, throws an exception if it is not
@@ -563,7 +581,6 @@ class Client implements TransportInterface
         $request->execute();
     }
 
-
     /**
      * Moves a node from src to dst
      *
@@ -588,7 +605,6 @@ class Client implements TransportInterface
     {
         throw new NotImplementedException();
     }
-
 
     /**
      * Recursively store a node and its children to the given absolute path.
@@ -684,10 +700,16 @@ class Client implements TransportInterface
         $path = $property->getPath();
         $this->ensureAbsolutePath($path);
 
-        $type = \PHPCR\PropertyType::nameFromValue($property->getType());
+        $typeid = $property->getType();
+        $type = PropertyType::nameFromValue($typeid);
+        if ($typeid == PropertyType::REFERENCE ||
+            $typeid == PropertyType::WEAKREFERENCE) {
+                $nativeValue = $property->getString();
+            } else {
+                $nativeValue = $property->getValue();
+        }
 
         $request = $this->getRequest(Request::PUT, $path);
-        $nativeValue = $property->getValue();
         if ($property->getName() === 'jcr:mixinTypes') {
             $uri = $this->normalizeUri(dirname($path) === '\\' ? '/' : dirname($path));
             $request->setUri($uri);
@@ -721,32 +743,46 @@ class Client implements TransportInterface
         return true;
     }
 
+    /**
+     * This method is used when building an XML of the properties
+     *
+     * @param  $value
+     * @param  $type
+     * @return mixed|string
+     */
     protected function propertyToXmlString($value, $type)
     {
         switch ($type) {
-        case \PHPCR\PropertyType::TYPENAME_DATE:
-            return $value->format(\Jackalope\Helper::DATETIME_FORMAT);
-        case \PHPCR\PropertyType::TYPENAME_BINARY:
-            return base64_encode($value);
-        case \PHPCR\PropertyType::TYPENAME_UNDEFINED:
-        case \PHPCR\PropertyType::TYPENAME_STRING:
-        case \PHPCR\PropertyType::TYPENAME_URI:
-            $value = str_replace(']]>',']]]]><![CDATA[>',$value);
-            return '<![CDATA['.$value.']]>';
+            case \PHPCR\PropertyType::TYPENAME_DATE:
+                return $value->format(\Jackalope\Helper::DATETIME_FORMAT);
+            case \PHPCR\PropertyType::TYPENAME_BINARY:
+                return base64_encode(stream_get_contents($value));
+            case \PHPCR\PropertyType::TYPENAME_UNDEFINED:
+            case \PHPCR\PropertyType::TYPENAME_STRING:
+            case \PHPCR\PropertyType::TYPENAME_URI:
+                $value = str_replace(']]>',']]]]><![CDATA[>',$value);
+                return '<![CDATA['.$value.']]>';
         }
         //FIXME: handle boolean correctly. strings true and false?
         return $value;
     }
 
+    /**
+     * This method is used to directly set a property
+     * 
+     * @param  $value
+     * @param  $type
+     * @return mixed|string
+     */
     protected function propertyToRawString($value, $type)
     {
-        // skip binary encoding for raw strings
         switch ($type) {
-        case \PHPCR\PropertyType::TYPENAME_BINARY:
-        case \PHPCR\PropertyType::TYPENAME_UNDEFINED:
-        case \PHPCR\PropertyType::TYPENAME_STRING:
-        case \PHPCR\PropertyType::TYPENAME_URI:
-            return $value;
+            case \PHPCR\PropertyType::TYPENAME_BINARY:
+                return stream_get_contents($value);
+            case \PHPCR\PropertyType::TYPENAME_UNDEFINED:
+            case \PHPCR\PropertyType::TYPENAME_STRING:
+            case \PHPCR\PropertyType::TYPENAME_URI:
+                return $value;
         }
         return $this->propertyToXmlString($value, $type);
     }
