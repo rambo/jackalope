@@ -76,7 +76,7 @@ abstract class Midgard implements TransportInterface
      * @return true on success (exceptions on failure)
      *
      * @throws \PHPCR\LoginException if authentication or authorization (for the specified workspace) fails
-     * @throws \PHPCR\NoSuchWorkspacexception if the specified workspaceName is not recognized
+     * @throws \PHPCR\NoSuchWorkspaceException if the specified workspaceName is not recognized
      * @throws \PHPCR\RepositoryException if another error occurs
      * @see \Jackalope\TransportInterface::login()
      */
@@ -114,7 +114,7 @@ abstract class Midgard implements TransportInterface
         $rootnodes = $this->getRootObjects($workspacename);
         if (empty($rootnodes))
         {
-            throw new \PHPCR\NoSuchWorkspacexception('No workspaces defined');
+            throw new \PHPCR\NoSuchWorkspaceException('No workspaces defined');
         }
         return $rootnodes[0];
     }
