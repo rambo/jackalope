@@ -269,8 +269,10 @@ class ObjectManager
      *
      * If you have an absolute path use {@link getNodeByPath()}.
      *
-     * @param string uuid or relative path
-     * @param string optional root if you are in a node context - not used if $identifier is an uuid
+     * @param string $identifier uuid or relative path
+     * @param string $root optional root if you are in a node context - not used if $identifier is an uuid
+     * @param string $class optional class name for the factory
+     *
      * @return \PHPCR\Node The specified Node. if not available, ItemNotFoundException is thrown
      *
      * @throws \PHPCR\ItemNotFoundException If the path was not found
@@ -444,7 +446,7 @@ class ObjectManager
             foreach ($this->objectsByPath['Node'] as $path => $item) {
                 if ($item->isModified()) {
                     if ($item instanceof \PHPCR\NodeInterface) {
-                        foreach ($item->getProperties() as $propertyName => $property) {
+                        foreach ($item->getProperties() as $property) {
                             if ($property->isModified()) {
                                 $this->transport->storeProperty($property);
                             }
@@ -479,7 +481,7 @@ class ObjectManager
             $item->confirmSaved();
         }
         if (isset($this->objectsByPath['Node'])) {
-            foreach ($this->objectsByPath['Node'] as $path => $item) {
+            foreach ($this->objectsByPath['Node'] as $item) {
                 if ($item->isModified()) {
                     $item->confirmSaved();
                 }
@@ -502,7 +504,7 @@ class ObjectManager
     {
         $path = $this->getTransport()->checkinItem($absPath);
         $node = $this->getNodeByPath($path, "Version\Version");
-        $predecessorUuids = $node->getProperty('jcr:predecessors')->getValue();
+        $predecessorUuids = $node->getProperty('jcr:predecessors')->getString();
         if (!empty($predecessorUuids[0]) && isset($this->objectsByUuid[$predecessorUuids[0]])) {
             $dirtyPath = $this->objectsByUuid[$predecessorUuids[0]];
             unset($this->objectsByPath['Version\Version'][$dirtyPath]);
@@ -586,7 +588,7 @@ class ObjectManager
         }
 
         // was any parent moved?
-        foreach ($this->nodesMove as $src=>$dst) {
+        foreach ($this->nodesMove as $dst) {
             if (strpos($dst, $absPath) === 0) {
                 // this is MOVE, then DELETE but we dispatch DELETE before MOVE
                 // TODO we might could just remove the MOVE and put a DELETE on the previous node :)

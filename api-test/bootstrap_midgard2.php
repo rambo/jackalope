@@ -1,6 +1,11 @@
 <?php
 require_once(dirname(__FILE__) . '/../src/Jackalope/autoloader.php');
 
+if (getenv('MIDGARD_ENV_GLOBAL_SHAREDIR') != '/tmp/JackalopeMidgard2/share')
+{
+    die("\nBefore running these tests you need to run 'export MIDGARD_ENV_GLOBAL_SHAREDIR=/tmp/JackalopeMidgard2/share'\n");
+}
+
 function getRepository($config) {
     $mgd = getMidgardConnection();
 
