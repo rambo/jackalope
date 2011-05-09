@@ -44,7 +44,7 @@ abstract class Midgard implements TransportInterface
         }
     }
     
-    abstract function midgardConnect();
+    abstract protected function midgardConnect();
 
     /**
      * Get the repository descriptors from Midgard2
@@ -412,7 +412,7 @@ abstract class Midgard implements TransportInterface
     /**
      * Resolve objects path.
      */
-    function getPathForMidgardObject(&$object)
+    protected function getPathForMidgardObject(&$object)
     {
         $parts = array();
         $parts[] = $object->name;
