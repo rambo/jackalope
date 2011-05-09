@@ -8,6 +8,14 @@ function getRepository($config) {
     return new \Jackalope\Repository(null, null, $transport);
 }
 
+function prepareMidgardTestDir($dir)
+{
+    if (!file_exists("/tmp/JackalopeMidgard2/{$dir}"))
+    {
+        mkdir("/tmp/JackalopeMidgard2/{$dir}", 0777, true);
+    }
+}
+
 function getMidgardConnection() {
     // Open connection
     $midgard = \midgard_connection::get_instance();
@@ -17,14 +25,10 @@ function getMidgardConnection() {
         return $midgard;
     }
 
-    if (!file_exists('/tmp/JackalopeMidgard2/share'))
-    {
-        mkdir("/tmp/JackalopeMidgard2/share", 0777, true);
-    }
-    if (!file_exists('/tmp/JackalopeMidgard2/blobs'))
-    {
-        mkdir("/tmp/JackalopeMidgard2/blobs", 0777, true);
-    }
+    prepareMidgardTestDir('share');
+    prepareMidgardTestDir('blobs');
+    prepareMidgardTestDir('var');
+    prepareMidgardTestDir('cache');
 
     exec("cp -r Midgard2/share/* /tmp/JackalopeMidgard2/share");
     
