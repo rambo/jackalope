@@ -272,7 +272,7 @@ abstract class Midgard implements TransportInterface
         $ref =& $this->getMgdschemaReflector($object_class);
 
         // Normal properties
-        $properties = $this->getMgdschemaProperties($mgdschema_type);
+        $properties = $this->getMgdschemaProperties($object_class);
         foreach($properties as $property_name)
         {
             if ($ref->is_link($property_name))
@@ -446,13 +446,13 @@ abstract class Midgard implements TransportInterface
         unset($properties['metadata'], $properties['id'], $properties['guid']);
 
         // Remove also parent and up links, the proper way is to use the node->getParent() and exposing the references can lead to people using wrong interface
-        $parent_prop = midgard_object_class::get_property_parent($class);
+        $parent_prop = \midgard_object_class::get_property_parent($class);
         if ($parent_prop)
         {
             unset($properties[$parent_prop]);
         }
         unset($parent_prop);
-        $up_prop = midgard_object_class::get_property_up($class);
+        $up_prop = \midgard_object_class::get_property_up($class);
         if ($up_prop)
         {
             unset($properties[$up_prop]);
@@ -540,7 +540,7 @@ abstract class Midgard implements TransportInterface
         
         if (isset($cache[$mgdschema_type]))
         {
-            return $mgdschema_type;
+            return $cache[$mgdschema_type];
         }
         $cache[$mgdschema_type] = new $mgdschema_type();
         return $cache[$mgdschema_type];
@@ -593,7 +593,7 @@ abstract class Midgard implements TransportInterface
             case MGD_TYPE_GUID:
                 // Fall-through for now
             case MGD_TYPE_STRING:
-                if ($property_name === $this->getNameProperty($mgdschema_type))
+                if ($property === $this->getNameProperty($mgdschema_type))
                 {
                     return \PHPCR\PropertyType::TYPENAME_PATH;
                 }

@@ -52,6 +52,12 @@ class Midgard2XMLImporter extends \DomDocument
         }
     }
 
+    private function getPropertyValue(\DOMElement $property)
+    {
+        $typeElement = $property->getElementsByTagNameNS($this->ns_sv, 'value');
+        return $typeElement->item(0)->textContent;
+    }
+
     private function getNodeType(\DOMElement $node)
     {
         $propertyElements = $node->getElementsByTagNameNS($this->ns_sv, 'property');
@@ -60,8 +66,55 @@ class Midgard2XMLImporter extends \DomDocument
             $propertyName = $property->getAttributeNS($this->ns_sv, 'name');
             if ($propertyName == 'jcr:primaryType')
             {
-                $typeElement = $property->getElementsByTagNameNS($this->ns_sv, 'value');
-                return $typeElement->item(0)->textContent;
+                return $this->getPropertyValue($property);
+            }
+        }
+        return null;
+    }
+
+    private function writeProperty(\midgard_object $object, \DOMElement $property)
+    {
+        $propertyName = $property->getAttributeNS($this->ns_sv, 'name');
+        if ($propertyName == 'jcr:primaryType')
+        {
+            return false;
+        }
+
+        if (substr($propertyName, 0, 4) == 'mgd:')
+        {
+            $propertyName = substr($propertyName, 4);
+            $object->$propertyName = $this->getPropertyValue($property);
+            return $object->update();
+        }
+
+        $parts = explode(':', $propertyName);
+        if (count($parts) != 2)
+        {
+            $parts[1] = $parts[0];
+            $parts[0] = 'phpcr:undefined';
+        }
+        return $object->set_parameter($parts[0], $parts[1], $this->getPropertyValue($property));
+    }
+
+    private function mapNodeType(\midgard_object $parent, $type)
+    {
+        if ($type == 'nt:folder')
+        {
+            return 'midgardmvc_core_node';
+        }
+        if ($type == 'nt:file')
+        {
+            return 'midgard_attachment';
+        }
+        if ($type == 'nt:unstructured')
+        {
+            if (get_class($parent) == 'midgardmvc_core_node')
+            {
+                return 'midgardmvc_core_node';
+            }
+            if (get_class($parent) == 'midgard_attachment')
+            {
+                return 'midgard_attachment';
             }
         }
         return null;
@@ -73,24 +126,21 @@ class Midgard2XMLImporter extends \DomDocument
         $propertyElements = $node->getElementsByTagNameNS($this->ns_sv, 'property');
 
         $type = $this->getNodeType($node);
-        $class = null;
-        if ($type == 'nt:folder' ||
-            $type == 'nt:unstructured')
-        {
-            $class = 'midgardmvc_core_node';
-        }
-        if ($type == 'nt:file')
-        {
-            $class = 'midgard_attachment';
-        }
-
+        $class = $this->mapNodeType($parent, $type);
         if (!$class)
         {
             return;
         }
         
         $object = null;
-        $siblings = $parent->list_children($class);
+        if ($class == get_class($parent))
+        {
+            $siblings = $parent->list();
+        }
+        else
+        {
+            $siblings = $parent->list_children($class);
+        }
         foreach ($siblings as $sibling)
         {
             if ($sibling->name == $name)
@@ -102,7 +152,14 @@ class Midgard2XMLImporter extends \DomDocument
         {
             $object = new $class();
             $object->name = $name;
-            $object->up = $parent->id;
+            if ($class == 'midgard_attachment')
+            {
+                $object->parentguid = $parent->guid;
+            }
+            else
+            {
+                $object->up = $parent->id;
+            }
         }
 
         if (!$object->guid)
@@ -112,6 +169,11 @@ class Midgard2XMLImporter extends \DomDocument
         else
         {
             $object->update();
+        }
+
+        foreach ($propertyElements as $propertyElement)
+        {
+            $this->writeProperty($object, $propertyElement);
         }
 
         $nodeElements = $node->getElementsByTagNameNS($this->ns_sv, 'node');
@@ -127,7 +189,7 @@ class Midgard2XMLImporter extends \DomDocument
         $q->set_constraint(new \midgard_query_constraint(new \midgard_query_property('up'), '=', new \midgard_query_value(0)));
         $q->execute();
         $root_object = current($q->list_objects());
-        if (!$root_object)
+        if ($q->get_results_count() == 0)
         {
             $root_object = new \midgardmvc_core_node();
             $root_object->name = "jackalope";
