@@ -10,22 +10,26 @@ function getRepository($config) {
 
 function getMidgardConnection() {
     // Open connection
-    $midgard = midgard_connection::get_instance();
+    $midgard = \midgard_connection::get_instance();
     if ($midgard->is_connected())
     {
         // Already connected
         return $midgard;
     }
+
+    if (!file_exists('/tmp/JackalopeMidgard2/share'))
+    {
+        mkdir("/tmp/JackalopeMidgard2/share", 0777, true);
+    }
+    if (!file_exists('/tmp/JackalopeMidgard2/blobs'))
+    {
+        mkdir("/tmp/JackalopeMidgard2/blobs", 0777, true);
+    }
+
+    exec("cp -r Midgard2/share/* /tmp/JackalopeMidgard2/share");
     
-    $config = new midgard_config();
-    $config->dbtype = 'SQLite';
-    $config->database = 'JackalopeTest';
-    $config->databasedir = '/tmp';
-    $config->blobdir = "/tmp/JackalopeTest";
-    $config->tablecreate = true;
-    $config->tableupdate = true;
-    $config->loglevel = 'critical';
- 
+    $config = new \midgard_config();
+    $config->read_file_at_path(dirname(__FILE__) . "/Midgard2/midgard2.conf");
     if (!$midgard->open_config($config))
     {
         throw new Exception('Could not open Midgard connection to test database: ' . $midgard->get_error_string());
@@ -81,7 +85,7 @@ function getJCRSession($config, $credentials = null)
 
 function getFixtureLoader($config)
 {
-    require_once "Midgard2ImportExport.php";
+    require_once "Midgard2/Midgard2ImportExport.php";
     return new Midgard2ImportExport(__DIR__."/suite/fixtures/");
 }
 

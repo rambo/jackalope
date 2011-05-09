@@ -29,7 +29,7 @@ class Midgard2XMLImporter extends \DomDocument
 
         /* The hierarchy of the content repository nodes and properties is reflected in
          * the hierarchy of the corresponding XML elements. */
-        $mvc_node = new midgardmvc_core_node();
+        $mvc_node = new \midgardmvc_core_node();
         $mvc_node->name = $name;
         $mvc_node->up = $parent->id;
         $mvc_node->create();
@@ -67,7 +67,7 @@ class Midgard2XMLImporter extends \DomDocument
         return null;
     }
 
-    private function writeNode(midgard_object $parent, \DOMElement $node)
+    private function writeNode(\midgard_object $parent, \DOMElement $node)
     {
         $name = $node->getAttributeNS($this->ns_sv, 'name');
         $propertyElements = $node->getElementsByTagNameNS($this->ns_sv, 'property');
