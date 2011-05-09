@@ -228,17 +228,21 @@ abstract class Midgard implements TransportInterface
         {
             throw new \PHPCR\ItemNotFoundException("No object at {$path}");
         }
+        $object_class = get_class($object);
 
         $props = get_object_vars($object);
         foreach ($props as $property => $value)
         {
+            // TODO: handle the guid property separately
+            // TODO: deference link properties (at least to the (uu|gu)ids)
             $node->{$property} = $value;
-            $node->{':' . $property} = $this->getPropertyType(get_class($object), $property);
+            $node->{':' . $property} = $this->getPropertyType($object_class, $property);
         }
 
         $children = $this->getChildren($object);
         foreach ($children as $child)
         {
+            // I don't quite understand what is being done here --rambo
             $name_property = $this->getNameProperty($child);
             if (!$name_property)
             {
@@ -254,9 +258,21 @@ abstract class Midgard implements TransportInterface
         return $node;
     }
 
+    /**
+     * Helper to get a midgard_reflection_property for given mgdschema type
+     *
+     * @param string $mgdschema_type the mgdschema class name
+     * @return reference to the reflector object
+     * @throws \PHPCR\RepositoryException in case of trouble
+     */
     protected function &getMgdschemaReflector($mgdschema_type)
     {
         static $reflectors = array();
+        // Safety against passing an object here
+        if (is_object($mgdschema_type))
+        {
+            $mgdschema_type = \get_class($mgdschema_type);
+        }
         if (isset($reflectors[$mgdschema_type]))
         {
             return $reflectors[$mgdschema_type];
@@ -384,9 +400,17 @@ abstract class Midgard implements TransportInterface
     {
         $ref =& $this->getMgdschemaReflector($mgdschema_type);
         $type = $ref->get_midgard_type($property);
+        
+        // Link property handling
+        if ($ref->is_link($property))
+        {
+            return \PHPCR\PropertyType::WEAKREFERENCE;
+        }
    
         switch($type)
         {
+            case MGD_TYPE_GUID:
+                // Fall-through for now
             case MGD_TYPE_STRING:
                 // TODO: Any better way to determine the name property ?
                 if ($property_name === $this->getNameProperty($mgdschema_type))
@@ -396,9 +420,25 @@ abstract class Midgard implements TransportInterface
                 return \PHPCR\PropertyType::STRING;
                 break;
 
-            // TODO: Handle link fields as refs/weakrefs
-            
-            // TODO: Handle other mgdschema types
+            case MGD_TYPE_BOOLEAN:
+                return \PHPCR\PropertyType::BOOLEAN;
+                break;
+
+            case MGD_TYPE_INT:
+                return \PHPCR\PropertyType::LONG;
+                break;
+
+            case MGD_TYPE_UINT:
+                return \PHPCR\PropertyType::LONG;
+                break;
+
+            case MGD_TYPE_FLOAT:
+                return \PHPCR\PropertyType::DOUBLE;
+                break;
+
+            case MGD_TYPE_TIMESTAMP:
+                return \PHPCR\PropertyType::DATE;
+                break;
 
             default:
                 return \PHPCR\PropertyType::UNDEFINED;
