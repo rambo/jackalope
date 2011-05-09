@@ -305,6 +305,8 @@ abstract class Midgard implements TransportInterface
         $node->{'jcr:uuid'} = $object->guid;
         $node->{':jcr:uuid'} = \PHPCR\PropertyType::TYPENAME_STRING;
         
+        // TODO: handle record extensions
+        
         //TODO: How to handle JCR primary and mixin types (for example almost all midgard objects are referenceable)
 
         $children = $this->getChildren($object);
@@ -418,6 +420,8 @@ abstract class Midgard implements TransportInterface
             
         );
         */
+        
+        // TODO: How to specify that we allow adding of arbitary properties (internally handled as midgard_parameter) ??
         
         return $data;
     }
