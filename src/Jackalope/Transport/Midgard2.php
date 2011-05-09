@@ -96,7 +96,7 @@ class Midgard2 extends Midgard
 
     protected function getRootObjects()
     {
-        // TODO: Support all MgdSchema rootlevel types
+        // TODO: Choose the topic based on workspace name
         $q = new \midgard_query_select(new \midgard_query_storage('midgardmvc_core_node'));
         $q->set_constraint(new \midgard_query_constraint(new \midgard_query_property('up'), '=', new \midgard_query_value(0)));
         $q->execute();

@@ -108,7 +108,7 @@ abstract class Midgard implements TransportInterface
 
     protected function getRootObject($workspacename = '')
     {
-        $rootnodes = $this->getRootObjects();
+        $rootnodes = $this->getRootObjects($workspacename;
         if (empty($rootnodes))
         {
             throw new \PHPCR\NoSuchWorkspacexception('No workspaces defined');
@@ -116,7 +116,7 @@ abstract class Midgard implements TransportInterface
         return $rootnodes[0];
     }
 
-    abstract protected function getRootObjects();
+    abstract protected function getRootObjects($workspacename);
 
     abstract protected function getTypes();
 

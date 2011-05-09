@@ -92,9 +92,11 @@ class Midgard1 extends Midgard
     /**
      * Via JCR we normally expose only the topic tree, other types will be under "unfiled" later
      */
-    protected function getRootObjects()
+    protected function getRootObjects($workspacename)
     {
+        // TODO: Choose the topic based on workspace name
         $qb = new \midgard_query_builder('midgard_topic');
+        $qb->add_constraint('sitegroup', '=', $_MIDGARD['sitegroup']);
         $qb->add_constraint('up', '=', 0);
         $results = $qb->execute();
         unset($qb);
