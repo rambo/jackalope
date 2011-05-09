@@ -235,6 +235,7 @@ abstract class Midgard implements TransportInterface
         {
             // TODO: handle the guid property separately
             // TODO: deference link properties (at least to the (uu|gu)ids)
+            // TODO: How to handle the metadata magic property
             $node->{$property} = $value;
             $node->{':' . $property} = $this->getPropertyType($object_class, $property);
         }
