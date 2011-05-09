@@ -223,8 +223,33 @@ abstract class Midgard implements TransportInterface
     protected function dereferenceMgdLink($object, $property_name, $ref)
     {
         $ret = array();
+        $type = $ref->get_midgard_type($property_name);
+        $target_class = '\\' . $ref->get_link_name($property_name);
         $ret[1] = \PHPCR\PropertyType::TYPENAME_WEAKREFERENCE;
-        throw new Exception('Not implemented');
+        switch($type)
+        {
+            case MGD_TYPE_UINT:
+                // We suppose this is a link to id so we can instantiate by it
+                try
+                {
+                    $target_object = new $target_class($object->{$property_name});
+                    $ret[0] = $target_object->guid;
+                }
+                catch (\midgard_error_exception $e)
+                {
+                    $ret[0] = '';
+                }
+                break;
+            case MGD_TYPE_STRING:
+            case MGD_TYPE_GUID:
+                // Weakref so don't bother checking if we can instantiate the object
+                $ret[0] = $object->{$property_name};
+                break;
+            default:
+                // Don't know how to deref this type
+                $ret[0] = '';
+                break;
+        }
     }
 
     /**
@@ -413,7 +438,23 @@ abstract class Midgard implements TransportInterface
             return $cache[$class];
         }
         $properties = get_object_vars($dummy);
+        // Remove common properties that are handled in special way
         unset($properties['metadata'], $properties['id'], $properties['guid']);
+
+        // Remove also parent and up links, the proper way is to use the node->getParent() and exposing the references can lead to people using wrong interface
+        $parent_prop = midgard_object_class::get_property_parent($class);
+        if ($parent_prop)
+        {
+            unset($properties[$parent_prop]);
+        }
+        unset($parent_prop);
+        $up_prop = midgard_object_class::get_property_up($class);
+        if ($up_prop)
+        {
+            unset($properties[$up_prop]);
+        }
+        unset($up_prop);
+
         $cache[$class] = array_keys($properties);
         unset($dummy, $properties);
         return $cache[$class];
