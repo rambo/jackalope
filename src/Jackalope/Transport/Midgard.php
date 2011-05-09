@@ -438,7 +438,7 @@ abstract class Midgard implements TransportInterface
     /**
      * Resolve objects path.
      */
-    protected function getPathForMidgardObject(&$object)
+    protected function getPathForMidgardObject($object)
     {
         $parts = array();
         $parts[] = $object->name;
