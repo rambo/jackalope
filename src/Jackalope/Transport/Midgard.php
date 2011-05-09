@@ -412,7 +412,6 @@ abstract class Midgard implements TransportInterface
             case MGD_TYPE_GUID:
                 // Fall-through for now
             case MGD_TYPE_STRING:
-                // TODO: Any better way to determine the name property ?
                 if ($property_name === $this->getNameProperty($mgdschema_type))
                 {
                     return \PHPCR\PropertyType::PATH;
