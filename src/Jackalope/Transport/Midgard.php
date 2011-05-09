@@ -43,6 +43,8 @@ abstract class Midgard implements TransportInterface
             $this->midgardConnect();
         }
     }
+    
+    abstract function midgardConnect();
 
     /**
      * Get the repository descriptors from Midgard2
@@ -86,6 +88,8 @@ abstract class Midgard implements TransportInterface
         }  
         return $this->midgardLogin($credentials, $workspaceName);
     }
+    
+    abstract function midgardLogin(\PHPCR\CredentialsInterface $credentials, $workspaceName);
 
     /**
      * Get the registered namespaces mappings from Midgard2.
@@ -107,7 +111,7 @@ abstract class Midgard implements TransportInterface
 
     protected function getRootObject($workspacename = '')
     {
-        $rootnodes = $this->getRootObjects();
+        $rootnodes = $this->getRootObjects($workspacename);
         if (empty($rootnodes))
         {
             throw new \PHPCR\NoSuchWorkspacexception('No workspaces defined');
@@ -115,17 +119,9 @@ abstract class Midgard implements TransportInterface
         return $rootnodes[0];
     }
 
-    protected function getRootObjects()
-    {
-        // TODO: Use NotImplementedException or something ?
-        throw new Exception('Must be implemented in a subclass');
-    }
+    abstract protected function getRootObjects($workspacename);
 
-    protected function getTypes()
-    {
-        // TODO: Use NotImplementedException or something ?
-        throw new Exception('Must be implemented in a subclass');
-    }
+    abstract protected function getTypes();
 
     protected function getChildTypes($midgard_class)
     {
@@ -145,11 +141,12 @@ abstract class Midgard implements TransportInterface
                 'up' => \midgard_object_class::get_property_up($mgdschema),
             );
 
-            $ref = new \midgard_reflection_property($mgdschema);
+            $ref =& $this->getMgdschemaReflector($mgdschema_type);
             foreach ($link_properties as $type => $property)
             {
                 $link_class = $ref->get_link_name($property);
                 if (   empty($link_class)
+                    // TODO: What is this ? Why only GUID ?
                     && $ref->get_midgard_type($property) === MGD_TYPE_GUID)
                 {
                     $child_types[] = $mgdschema;
@@ -181,6 +178,11 @@ abstract class Midgard implements TransportInterface
         $children = $this->getChildren($object);
         foreach ($children as $child)
         {
+            // TODO: Better checks via midgard reflection ?
+            if (!\property_exists($child, 'name'))
+            {
+                continue;
+            }
             if ($child->name == $name)
             {
                 return $child;
@@ -210,27 +212,6 @@ abstract class Midgard implements TransportInterface
         return $object;
     }
 
-    protected function getPropertyType($class, $property)
-    {
-        static $reflectors = array();
-        if (!isset($reflectors[$class]))
-        {
-            $reflectors[$class] = new \midgard_reflection_property($class);
-        }
-        $type = $reflectors[$class]->get_midgard_type($property);
-   
-        if ($type == MGD_TYPE_STRING)
-        {
-            if ($property == 'name')
-            {
-                return \PHPCR\PropertyType::PATH;
-            }
-            return \PHPCR\PropertyType::STRING;
-        }
-
-        return \PHPCR\PropertyType::UNDEFINED;
-    }
-
     /**
      * Get the node that is stored at an absolute path
      *
@@ -258,6 +239,10 @@ abstract class Midgard implements TransportInterface
         $children = $this->getChildren($object);
         foreach ($children as $child)
         {
+            if (!\property_exists($child, 'name'))
+            {
+                continue;
+            }
             if (!$child->name)
             {
                 continue;
@@ -267,6 +252,134 @@ abstract class Midgard implements TransportInterface
 
         return $node;
     }
+
+    protected function &getMgdschemaReflector($mgdschema_type)
+    {
+        static $reflectors = array();
+        if (isset($reflectors[$mgdschema_type]))
+        {
+            return $reflectors[$mgdschema_type];
+        }
+        $ref = new \midgard_reflection_property($mgdschema_type);
+        if (!$ref)
+        {
+            throw new \PHPCR\RepositoryException(midgard_connection::get_error_string());
+        }
+        $reflectors[$mgdschema_type] = $ref;
+        unset($ref);
+        return $reflectors[$mgdschema_type];
+    }
+
+    /**
+     * Gets an array usable with Jackalope\NodeTypeDefinition::fromArray for given MgdSchema name
+     *
+     * @param string $mgdschema_type name of the mgschema registered class
+     * @return array usable Jackalope\NodeTypeDefinition::fromArray
+     */
+    public function getNodeTypeDefArray($mgdschema_type)
+    {
+        $ref =& $this->getMgdschemaReflector($mgdschema_type);
+/**
+ * The fromArray code for reference
+ *
+        $this->name = $data['name'];
+        $this->isAbstract = $data['isAbstract'];
+        $this->isMixin = $data['isMixin'];
+        $this->isQueryable = $data['isQueryable'];!
+        $this->hasOrderableChildNodes = $data['hasOrderableChildNodes'];
+        $this->primaryItemName = $data['primaryItemName'] ?: null;
+        $this->declaredSuperTypeNames = (isset($data['declaredSuperTypeNames']) && count($data['declaredSuperTypeNames'])) ? $data['declaredSuperTypeNames'] : array();
+        $this->declaredPropertyDefinitions = new ArrayObject();
+        foreach ($data['declaredPropertyDefinitions'] AS $propertyDef) {
+            $this->declaredPropertyDefinitions[] = $this->factory->get(
+                'NodeType\PropertyDefinition',
+                array($propertyDef, $this->nodeTypeManager)
+            );
+        }
+        
+        
+        $this->declaredNodeDefinitions = new ArrayObject();
+        foreach ($data['declaredNodeDefinitions'] AS $nodeDef) {
+            $this->declaredNodeDefinitions[] = $this->factory->get(
+                'NodeType\NodeDefinition',
+                array($nodeDef, $this->nodeTypeManager)
+            );
+        }
+*/
+
+        $data['name'] = $mgdschema_type;
+        $data['hasOrderableChildNodes'] = true;
+        
+        return $data;
+    }
+
+    /**
+     * Gets an array usable with Jackalope\PropertyDefinition::fromArray for given MgdSchema name
+     *
+     * @param string $mgdschema_type name of the mgschema registered class
+     * @param string $property_name name of the mgdschema property
+     * @return array usable Jackalope\PropertyDefinition::fromArray
+     */
+    public function getPropertyDefArray($mgdschema_type, $property_name)
+    {
+        $ref =& $this->getMgdschemaReflector($mgdschema_type);
+/**
+ * The fromArray code for reference
+ *
+        parent::fromArray($data);
+        // begin parent
+        $this->declaringNodeType = $data['declaringNodeType'];
+        $this->name = $data['name'];
+        $this->isAutoCreated = $data['isAutoCreated'];
+        $this->isMandatory = isset($data['mandatory']) ? $data['mandatory'] : false;
+        $this->isProtected = $data['isProtected'];
+        $this->onParentVersion = $data['onParentVersion'];        
+        // end parent
+        
+        $this->requiredType = $data['requiredType'];
+        $this->isMultiple = isset($data['multiple']) ? $data['multiple'] : false;
+        $this->isFullTextSearchable = isset($data['fullTextSearchable']) ? $data['fullTextSearchable'] : false;
+        $this->isQueryOrderable = isset($data['queryOrderable']) ? $data['queryOrderable'] : false;
+        $this->valueConstraints = isset($data['valueConstraints']) ? $data['valueConstraints'] : array();
+        $this->availableQueryOperators = isset($data['availableQueryOperators']) ? $data['availableQueryOperators'] : array();
+        $this->defaultValues = isset($data['defaultValues']) ? $data['defaultValues'] : array();
+*/
+
+        $data['name'] = $property_name;
+        $data['requiredType'] = $this->getPropertyType($mgdschema_type, $property_name);
+        $data['multiple'] = false;
+        return $data;
+    }
+
+    /**
+     * Get the \PHPCR\PropertyType for given mgdschema class property
+     *
+     * @param string $mgdschema_type name of the mgschema registered class
+     * @param string $property_name name of the mgdschema property
+     */
+    protected function getPropertyType($mgdschema_type, $property)
+    {
+        $ref =& $this->getMgdschemaReflector($mgdschema_type);
+        $type = $ref->get_midgard_type($property_name);
+   
+        if ($type == MGD_TYPE_STRING)
+        {
+            // TODO: Any better way to determine the name property ?
+            if ($property_name == 'name')
+            {
+                return \PHPCR\PropertyType::PATH;
+            }
+            return \PHPCR\PropertyType::STRING;
+        }
+        
+        // TODO: Handle link fields as refs/weakrefs
+        
+        // TODO: Handle other mgdschema types
+
+        return \PHPCR\PropertyType::UNDEFINED;
+    }
+
+
 
     public function getProperty($path)
     {
@@ -284,8 +397,44 @@ abstract class Midgard implements TransportInterface
      */
     public function getNodePathForIdentifier($uuid)
     {
-        throw new \PHPCR\ItemNotFoundException("Not found");
         // TODO: Implement with get_by_guid
+        try
+        {
+            $object = midgard_object_class::get_object_by_guid($guid);
+        }
+        catch (\midgard_error_exception $e)
+        {
+            throw new \PHPCR\ItemNotFoundException($e->getMessage());
+        }
+        return $this->getPathForMidgardObject($object);
+    }
+
+    /**
+     * Resolve objects path.
+     */
+    function getPathForMidgardObject(&$object)
+    {
+        $parts = array();
+        $parts[] = $object->name;
+        while (true)
+        {
+            try
+            {
+                $parent = $object->get_parent();
+                if (!$parent)
+                {
+                    break;
+                }
+            }
+            catch (\midgard_error_exception $e)
+            {
+                break;
+            }
+            $parts[] = $parent->name;
+        }
+        $ret = '/' . implode('/', array_reverse($parts));
+        unset($parts);
+        return $ret;
     }
 
     public function getBinaryStream($path)
