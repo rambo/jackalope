@@ -141,7 +141,7 @@ abstract class Midgard implements TransportInterface
                 'up' => \midgard_object_class::get_property_up($mgdschema),
             );
 
-            $ref =& $this->getMgdschemaReflector($mgdschema_type);
+            $ref =& $this->getMgdschemaReflector($mgdschema);
             foreach ($link_properties as $type => $property)
             {
                 $link_class = $ref->get_link_name($property);
@@ -360,12 +360,12 @@ abstract class Midgard implements TransportInterface
     protected function getPropertyType($mgdschema_type, $property)
     {
         $ref =& $this->getMgdschemaReflector($mgdschema_type);
-        $type = $ref->get_midgard_type($property_name);
+        $type = $ref->get_midgard_type($property);
    
         if ($type == MGD_TYPE_STRING)
         {
             // TODO: Any better way to determine the name property ?
-            if ($property_name == 'name')
+            if ($property == 'name')
             {
                 return \PHPCR\PropertyType::PATH;
             }
@@ -400,7 +400,7 @@ abstract class Midgard implements TransportInterface
         // TODO: Implement with get_by_guid
         try
         {
-            $object = midgard_object_class::get_object_by_guid($guid);
+            $object = \midgard_object_class::get_object_by_guid($guid);
         }
         catch (\midgard_error_exception $e)
         {
