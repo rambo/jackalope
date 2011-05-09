@@ -175,12 +175,12 @@ abstract class Midgard implements TransportInterface
         $children = $this->getChildren($object);
         foreach ($children as $child)
         {
-            // TODO: Better checks via midgard reflection ?
-            if (!\property_exists($child, 'name'))
+            $name_property = $this->getNameProperty($child);
+            if (!$name_property)
             {
                 continue;
             }
-            if ($child->name == $name)
+            if ($child->{$name_property} == $name)
             {
                 return $child;
             }
@@ -236,11 +236,12 @@ abstract class Midgard implements TransportInterface
         $children = $this->getChildren($object);
         foreach ($children as $child)
         {
-            if (!\property_exists($child, 'name'))
+            $name_property = $this->getNameProperty($child);
+            if (!$name_property)
             {
                 continue;
             }
-            if (!$child->name)
+            if (!$child->{$name_property})
             {
                 continue;
             }
@@ -349,6 +350,28 @@ abstract class Midgard implements TransportInterface
     }
 
     /**
+     * Get the name of the property considered the path-name of the object
+     *
+     * @param mixed $mgdschema_type MgdSchema class name or object instance
+     * @return string the name of the property or boolean false if it could not be determined
+     */
+    protected function getNameProperty($mgdschema_type)
+    {
+        // Prepend namespace in case it's not there
+        if (   is_string($mgdschema_type)
+            && $mgdschema_type[0] !== '\\')
+        {
+            $mgdschema_type = '\\' . $mgdschema_type;
+        }
+        // TODO: Better heuristics ?
+        if (\property_exists($mgdschema_type, 'name'))
+        {
+            return 'name';
+        }
+        return false;
+    }
+
+    /**
      * Get the \PHPCR\PropertyType for given mgdschema class property
      *
      * @param string $mgdschema_type name of the mgschema registered class
@@ -359,21 +382,24 @@ abstract class Midgard implements TransportInterface
         $ref =& $this->getMgdschemaReflector($mgdschema_type);
         $type = $ref->get_midgard_type($property_name);
    
-        if ($type == MGD_TYPE_STRING)
+        switch($type)
         {
-            // TODO: Any better way to determine the name property ?
-            if ($property_name == 'name')
-            {
-                return \PHPCR\PropertyType::PATH;
-            }
-            return \PHPCR\PropertyType::STRING;
-        }
-        
-        // TODO: Handle link fields as refs/weakrefs
-        
-        // TODO: Handle other mgdschema types
+            case MGD_TYPE_STRING:
+                // TODO: Any better way to determine the name property ?
+                if ($property_name === $this->getNameProperty($mgdschema_type))
+                {
+                    return \PHPCR\PropertyType::PATH;
+                }
+                return \PHPCR\PropertyType::STRING;
+                break;
 
-        return \PHPCR\PropertyType::UNDEFINED;
+            // TODO: Handle link fields as refs/weakrefs
+            
+            // TODO: Handle other mgdschema types
+
+            default:
+                return \PHPCR\PropertyType::UNDEFINED;
+        }
     }
 
 
