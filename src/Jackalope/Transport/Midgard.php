@@ -529,6 +529,15 @@ abstract class Midgard implements TransportInterface
         {
             throw new Exception('Got funky argument');
         }
+        // Instantiating midgard_metadata directly is not allowed (weird and bad things will happen if you try)
+        if ($mgdschema_type === '\\midgard_metadata')
+        {
+            // midgard_person is available both in midgard1 and midgard2 as "built-in" MgdSchema
+            $tmp = new \midgard_person();
+            $cache[$mgdschema_type] = $tmp->metadata;
+            unset($tmp);
+        }
+        
         if (isset($cache[$mgdschema_type]))
         {
             return $mgdschema_type;
