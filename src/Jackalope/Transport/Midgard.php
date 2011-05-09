@@ -405,7 +405,7 @@ abstract class Midgard implements TransportInterface
         // Link property handling
         if ($ref->is_link($property))
         {
-            return \PHPCR\PropertyType::WEAKREFERENCE;
+            return \PHPCR\PropertyType::TYPENAME_WEAKREFERENCE;
         }
    
         switch($type)
@@ -415,33 +415,33 @@ abstract class Midgard implements TransportInterface
             case MGD_TYPE_STRING:
                 if ($property_name === $this->getNameProperty($mgdschema_type))
                 {
-                    return \PHPCR\PropertyType::PATH;
+                    return \PHPCR\PropertyType::TYPENAME_PATH;
                 }
-                return \PHPCR\PropertyType::STRING;
+                return \PHPCR\PropertyType::TYPENAME_STRING;
                 break;
 
             case MGD_TYPE_BOOLEAN:
-                return \PHPCR\PropertyType::BOOLEAN;
+                return \PHPCR\PropertyType::TYPENAME_BOOLEAN;
                 break;
 
             case MGD_TYPE_INT:
-                return \PHPCR\PropertyType::LONG;
+                return \PHPCR\PropertyType::TYPENAME_LONG;
                 break;
 
             case MGD_TYPE_UINT:
-                return \PHPCR\PropertyType::LONG;
+                return \PHPCR\PropertyType::TYPENAME_LONG;
                 break;
 
             case MGD_TYPE_FLOAT:
-                return \PHPCR\PropertyType::DOUBLE;
+                return \PHPCR\PropertyType::TYPENAME_DOUBLE;
                 break;
 
             case MGD_TYPE_TIMESTAMP:
-                return \PHPCR\PropertyType::DATE;
+                return \PHPCR\PropertyType::TYPENAME_DATE;
                 break;
 
             default:
-                return \PHPCR\PropertyType::UNDEFINED;
+                return \PHPCR\PropertyType::TYPENAME_UNDEFINED;
         }
     }
 
