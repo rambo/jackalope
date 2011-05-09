@@ -108,7 +108,7 @@ abstract class Midgard implements TransportInterface
 
     protected function getRootObject($workspacename = '')
     {
-        $rootnodes = $this->getRootObjects($workspacename;
+        $rootnodes = $this->getRootObjects($workspacename);
         if (empty($rootnodes))
         {
             throw new \PHPCR\NoSuchWorkspacexception('No workspaces defined');
@@ -138,11 +138,12 @@ abstract class Midgard implements TransportInterface
                 'up' => \midgard_object_class::get_property_up($mgdschema),
             );
 
-            $ref = new \midgard_reflection_property($mgdschema);
+            $ref =& $this->getMgdschemaReflector($mgdschema_type);
             foreach ($link_properties as $type => $property)
             {
                 $link_class = $ref->get_link_name($property);
                 if (   empty($link_class)
+                    // TODO: What is this ? Why only GUID ?
                     && $ref->get_midgard_type($property) === MGD_TYPE_GUID)
                 {
                     $child_types[] = $mgdschema;
@@ -210,12 +211,8 @@ abstract class Midgard implements TransportInterface
 
     protected function getPropertyType($class, $property)
     {
-        static $reflectors = array();
-        if (!isset($reflectors[$class]))
-        {
-            $reflectors[$class] = new \midgard_reflection_property($class);
-        }
-        $type = $reflectors[$class]->get_midgard_type($property);
+        $ref =& $this->getMgdschemaReflector($mgdschema_type);
+        $type = $ref->get_midgard_type($property);
    
         if ($type == MGD_TYPE_STRING)
         {
@@ -227,6 +224,8 @@ abstract class Midgard implements TransportInterface
         }
         
         // TODO: Handle link fields as refs/weakrefs
+        
+        // TODO: Handle other mgdschema types
 
         return \PHPCR\PropertyType::UNDEFINED;
     }
@@ -270,6 +269,35 @@ abstract class Midgard implements TransportInterface
         }
 
         return $node;
+    }
+
+    protected function &getMgdschemaReflector($mgdschema_type)
+    {
+        static $reflectors = array();
+        if (isset($reflectors[$mgdschema_type]))
+        {
+            return $reflectors[$mgdschema_type];
+        }
+        $ref = new \midgard_reflection_property($mgdschema_type);
+        if (!$ref)
+        {
+            throw new \PHPCR\RepositoryException(midgard_connection::get_error_string());
+        }
+        $reflectors[$mgdschema_type] = $ref;
+        unset($ref);
+        return $reflectors[$mgdschema_type];
+    }
+
+    /**
+     * Gets an array usable with Jackalope\NodeTypeDefinition::fromArray for given MgdSchema name
+     *
+     * @param string $mgdschema_type name of the mgschema registered class
+     * @return array usable Jackalope\NodeTypeDefinition::fromArray
+     */
+    public function getNodeTypeDefArray($mgdschema_type)
+    {
+        $ref =& $this->getMgdschemaReflector($mgdschema_type);
+        $data['name'] = $mgdschema_type;
     }
 
     public function getProperty($path)
