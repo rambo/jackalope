@@ -1,13 +1,12 @@
 <?php
-
-class APITestXMLImporter extends \DomDocument
+class Midgard2XMLImporter extends \DomDocument
 {
     private $ns_sv = 'http://www.jcp.org/jcr/sv/1.0';
 
-    public function __construct ($filepath)
+    public function __construct($filepath)
     {
-        parent::__construct ();
-        $this->load($filepath); 
+        parent::__construct('1.0', 'UTF-8');
+        $this->load($filepath);
     }
 
     private function append_nodes(\DomNode $node, $parent)
@@ -17,8 +16,7 @@ class APITestXMLImporter extends \DomDocument
            return; 
         }
 
-        $name = "";
-
+        $name = '';
         foreach ($node->attributes as $element) 
         {
             /* The name of each JCR node or property becomes the value of the sv:name */
@@ -54,15 +52,73 @@ class APITestXMLImporter extends \DomDocument
         }
     }
 
-    private function get_nodes($root)
+    private function getNodeType(\DOMElement $node)
     {
-        /* Each JCR node becomes an XML element <sv:node>. */
-        $node = $this->getElementsByTagNameNS($this->ns_sv, 'node')->item(0);
-        if ($node == null)
+        $propertyElements = $node->getElementsByTagNameNS($this->ns_sv, 'property');
+        foreach ($propertyElements as $property)
+        {
+            $propertyName = $property->getAttributeNS($this->ns_sv, 'name');
+            if ($propertyName == 'jcr:primaryType')
+            {
+                $typeElement = $property->getElementsByTagNameNS($this->ns_sv, 'value');
+                return $typeElement->item(0)->textContent;
+            }
+        }
+        return null;
+    }
+
+    private function writeNode(midgard_object $parent, \DOMElement $node)
+    {
+        $name = $node->getAttributeNS($this->ns_sv, 'name');
+        $propertyElements = $node->getElementsByTagNameNS($this->ns_sv, 'property');
+
+        $type = $this->getNodeType($node);
+        $class = null;
+        if ($type == 'nt:folder' ||
+            $type == 'nt:unstructured')
+        {
+            $class = 'midgardmvc_core_node';
+        }
+        if ($type == 'nt:file')
+        {
+            $class = 'midgard_attachment';
+        }
+
+        if (!$class)
         {
             return;
         }
-        $this->append_nodes($node, $root);
+        
+        $object = null;
+        $siblings = $parent->list_children($class);
+        foreach ($siblings as $sibling)
+        {
+            if ($sibling->name == $name)
+            {
+                $object = $sibling;
+            }
+        }
+        if (!$object)
+        {
+            $object = new $class();
+            $object->name = $name;
+            $object->up = $parent->id;
+        }
+
+        if (!$object->guid)
+        {
+            $object->create();
+        }
+        else
+        {
+            $object->update();
+        }
+
+        $nodeElements = $node->getElementsByTagNameNS($this->ns_sv, 'node');
+        foreach ($nodeElements as $nodeElement)
+        {
+            $this->writeNode($object, $nodeElement);
+        }
     }
 
     public function execute()
@@ -71,9 +127,14 @@ class APITestXMLImporter extends \DomDocument
         $q->set_constraint(new \midgard_query_constraint(new \midgard_query_property('up'), '=', new \midgard_query_value(0)));
         $q->execute();
         $root_object = current($q->list_objects());
+        if (!$root_object)
+        {
+            $root_object = new \midgardmvc_core_node();
+            $root_object->name = "jackalope";
+            $root_object->create();
+        }
 
-        $this->get_nodes($root_object);
+        $root_node = $this->documentElement;
+        $this->writeNode($root_object, $root_node);
     }
 }
-
-?>
