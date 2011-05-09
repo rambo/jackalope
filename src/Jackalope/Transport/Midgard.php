@@ -230,15 +230,26 @@ abstract class Midgard implements TransportInterface
         }
         $object_class = get_class($object);
 
-        $props = get_object_vars($object);
-        foreach ($props as $property => $value)
+        // Normal properties
+        $properties = $this->getMgdschemaProperties($mgdschema_type);
+        foreach($properties as $property_name)
         {
-            // TODO: handle the guid property separately
-            // TODO: deference link properties (at least to the (uu|gu)ids)
-            // TODO: How to handle the metadata magic property
-            $node->{$property} = $value;
-            $node->{':' . $property} = $this->getPropertyType($object_class, $property);
+            // TODO: deference link properties (at least to the (uu|gu)ids) ?
+            $node->{$property_name} = $object->{$property_name};
+            $node->{':' . $property_name} = $this->getPropertyType($object_class, $property_name);
         }
+        // MD properties
+        $properties = $this->getMgdschemaProperties('midgard_metadata');
+        foreach($properties as $property_name)
+        {
+            $jcr_name = "mgd:metadata:{$property_name}";
+            $node->{$jcr_name} = $object->{$property_name};
+            $node->{':' . $jcr_name} = $this->getPropertyType('midgard_metadata', $property_name);
+        }
+        // GUID is a special case
+        $node->{'jcr:uuid'} = $object->guid;
+        
+        //TODO: How to handle JCR primary and mixin types (for example almost all midgard objects are referenceable)
 
         $children = $this->getChildren($object);
         foreach ($children as $child)
@@ -327,8 +338,44 @@ abstract class Midgard implements TransportInterface
 
         $data['name'] = $mgdschema_type;
         $data['hasOrderableChildNodes'] = true;
+
+
+        $data['declaredPropertyDefinitions'] = array();
+        $properties = $this->getMgdschemaProperties($mgdschema_type);
+        foreach($properties as $property_name)
+        {
+            $data['declaredPropertyDefinitions'][] = $this->getPropertyDefArray($mgdschema_type, $property_name);
+        }
+        // Append metadata properties
+        $properties = $this->getMgdschemaProperties('midgard_metadata');
+        foreach($properties as $property_name)
+        {
+            $data['declaredPropertyDefinitions'][] = $this->getPropertyDefArray($mgdschema_type, $property_name, "mgd:metadata:{$property_name}");
+        }
         
         return $data;
+    }
+
+    /**
+     * Get the list of properties for given MgdSchema type
+     *
+     * @param string $mgdschema_type the mgdschema classname (or object instance)
+     * @return array of the property names (metadata, id and guid properties excluded)
+     */
+    protected function getMgdschemaProperties($mgdschema_type)
+    {
+        static $cache = array();
+        $dummy = $this->getMgdDummyObject($mgdschema_type);
+        $class = get_class($dummy);
+        if (isset($cache[$class]))
+        {
+            return $cache[$class];
+        }
+        $properties = get_object_vars($dummy);
+        unset($properties['metadata'], $properties['id'], $properties['guid']);
+        $cache[$class] = array_keys($properties);
+        unset($dummy, $properties);
+        return $cache[$class];
     }
 
     /**
@@ -338,7 +385,7 @@ abstract class Midgard implements TransportInterface
      * @param string $property_name name of the mgdschema property
      * @return array usable Jackalope\PropertyDefinition::fromArray
      */
-    public function getPropertyDefArray($mgdschema_type, $property_name)
+    public function getPropertyDefArray($mgdschema_type, $property_name, $override_name = false)
     {
         $ref =& $this->getMgdschemaReflector($mgdschema_type);
 /**
@@ -364,9 +411,44 @@ abstract class Midgard implements TransportInterface
 */
 
         $data['name'] = $property_name;
+        if ($override_name)
+        {
+            $data['name'] = $override_name;
+        }
         $data['requiredType'] = $this->getPropertyType($mgdschema_type, $property_name);
         $data['multiple'] = false;
         return $data;
+    }
+
+
+    /**
+     * Get a dummy object usable to get object property list from MgdSchema class name
+     *
+     * @param string $mgdschema_type MgdSchema class name
+     */
+    protected function getMgdDummyObject($mgdschema_type)
+    {
+        static $cache = array();
+        // Prepend namespace in case it's not there
+        if (is_object($mgdschema_type))
+        {
+            $mgdschema_type = get_class($mgdschema_type);
+        }
+        if (   is_string($mgdschema_type)
+            && $mgdschema_type[0] !== '\\')
+        {
+            $mgdschema_type = '\\' . $mgdschema_type;
+        }
+        else
+        {
+            throw new Exception('Got funky argument');
+        }
+        if (isset($cache[$mgdschema_type]))
+        {
+            return $mgdschema_type;
+        }
+        $cache[$mgdschema_type] = new $mgdschema_type();
+        return $cache[$mgdschema_type];
     }
 
     /**
@@ -377,18 +459,20 @@ abstract class Midgard implements TransportInterface
      */
     protected function getNameProperty($mgdschema_type)
     {
-        // Prepend namespace in case it's not there
-        if (   is_string($mgdschema_type)
-            && $mgdschema_type[0] !== '\\')
+        static $cache = array();
+        $dummy = $this->getMgdDummyObject($mgdschema_type);
+        $class = get_class($dummy);
+        if (isset($cache[$class]))
         {
-            $mgdschema_type = '\\' . $mgdschema_type;
+            return $cache[$class];
         }
-        // TODO: Better heuristics ?
-        if (\property_exists($mgdschema_type, 'name'))
+        if (\property_exists($dummy, 'name'))
         {
-            return 'name';
+            $cache[$class] = 'name';
+            return $cache[$class];
         }
-        return false;
+        $cache[$class] = false;
+        return $cache[$class];
     }
 
     /**
