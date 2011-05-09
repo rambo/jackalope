@@ -31,9 +31,10 @@ function getMidgardConnection() {
     prepareMidgardTestDir('cache');
 
     exec("cp -r Midgard2/share/* /tmp/JackalopeMidgard2/share");
+    exec("cp Midgard2/midgard2.conf /tmp/JackalopeMidgard2/midgard2.conf");
     
     $config = new \midgard_config();
-    $config->read_file_at_path(dirname(__FILE__) . "/Midgard2/midgard2.conf");
+    $config->read_file_at_path("/tmp/JackalopeMidgard2/midgard2.conf");
     if (!$midgard->open_config($config))
     {
         throw new Exception('Could not open Midgard connection to test database: ' . $midgard->get_error_string());
