@@ -212,6 +212,21 @@ abstract class Midgard implements TransportInterface
         return $object;
     }
 
+
+    /**
+     * Deference a midgard link and return array of value and datatype
+     *
+     * @param object $object MgdSchema or midgard_metadata object
+     * @param string $property_name name of the property to dereference
+     * @param midgard_reflection_property $ref already instantiated midgard reflector
+     */
+    protected function dereferenceMgdLink($object, $property_name, $ref)
+    {
+        $ret = array();
+        $ret[1] = \PHPCR\PropertyType::TYPENAME_WEAKREFERENCE;
+        throw new Exception('Not implemented');
+    }
+
     /**
      * Get the node that is stored at an absolute path
      *
@@ -229,25 +244,41 @@ abstract class Midgard implements TransportInterface
             throw new \PHPCR\ItemNotFoundException("No object at {$path}");
         }
         $object_class = get_class($object);
+        $ref =& $this->getMgdschemaReflector($object_class);
 
         // Normal properties
         $properties = $this->getMgdschemaProperties($mgdschema_type);
         foreach($properties as $property_name)
         {
-            // TODO: deference link properties (at least to the (uu|gu)ids) ?
+            if ($ref->is_link($property_name))
+            {
+                $deref = $this->dereferenceMgdLink($object, $property_name, $ref);
+                $node->{$property_name} = $deref[0];
+                $node->{':' . $property_name} = $deref[1];
+                unset($deref);
+            }
             $node->{$property_name} = $object->{$property_name};
             $node->{':' . $property_name} = $this->getPropertyType($object_class, $property_name);
         }
         // MD properties
         $properties = $this->getMgdschemaProperties('midgard_metadata');
+        $mdref =& $this->getMgdschemaReflector('midgard_metadata');
         foreach($properties as $property_name)
         {
             $jcr_name = "mgd:metadata:{$property_name}";
-            $node->{$jcr_name} = $object->{$property_name};
+            if ($mdref->is_link($property_name))
+            {
+                $deref = $this->dereferenceMgdLink($object->metadata, $property_name, $mdref);
+                $node->{$jcr_name} = $deref[0];
+                $node->{':' . $jcr_name} = $deref[1];
+                unset($deref);
+            }
+            $node->{$jcr_name} = $object->metadata->{$property_name};
             $node->{':' . $jcr_name} = $this->getPropertyType('midgard_metadata', $property_name);
         }
         // GUID is a special case
         $node->{'jcr:uuid'} = $object->guid;
+        $node->{':jcr:uuid'} = \PHPCR\PropertyType::TYPENAME_STRING;
         
         //TODO: How to handle JCR primary and mixin types (for example almost all midgard objects are referenceable)
 
@@ -352,6 +383,16 @@ abstract class Midgard implements TransportInterface
         {
             $data['declaredPropertyDefinitions'][] = $this->getPropertyDefArray($mgdschema_type, $property_name, "mgd:metadata:{$property_name}");
         }
+        /**
+         * This should be defined by the very base types of JCR itself
+        $data['declaredPropertyDefinitions'][] = array
+        (
+            'name' => 'jcr:uuid',
+            'requiredType' => \PHPCR\PropertyType::TYPENAME_STRING,
+            // TODO: Other defintion
+            
+        );
+        */
         
         return $data;
     }
@@ -489,6 +530,7 @@ abstract class Midgard implements TransportInterface
         // Link property handling
         if ($ref->is_link($property))
         {
+            // TODO: Determine whether to use weak or hard reference
             return \PHPCR\PropertyType::TYPENAME_WEAKREFERENCE;
         }
    
