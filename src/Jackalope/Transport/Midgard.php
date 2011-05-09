@@ -36,12 +36,15 @@ use Jackalope\Helper;
 
 abstract class Midgard implements TransportInterface
 {
-    public function __construct()
+    public function __construct(\midgard_connection $connection = null)
     {
-        $this->midgardConnect();
+        if (!$connection)
+        {
+            $this->midgardConnect();
+        }
     }
     
-    abstract function midgardConnect();
+    abstract protected function midgardConnect();
 
     /**
      * Get the repository descriptors from Midgard2
@@ -138,7 +141,7 @@ abstract class Midgard implements TransportInterface
                 'up' => \midgard_object_class::get_property_up($mgdschema),
             );
 
-            $ref =& $this->getMgdschemaReflector($mgdschema_type);
+            $ref =& $this->getMgdschemaReflector($mgdschema);
             foreach ($link_properties as $type => $property)
             {
                 $link_class = $ref->get_link_name($property);
@@ -380,7 +383,7 @@ abstract class Midgard implements TransportInterface
     protected function getPropertyType($mgdschema_type, $property)
     {
         $ref =& $this->getMgdschemaReflector($mgdschema_type);
-        $type = $ref->get_midgard_type($property_name);
+        $type = $ref->get_midgard_type($property);
    
         switch($type)
         {
@@ -423,7 +426,7 @@ abstract class Midgard implements TransportInterface
         // TODO: Implement with get_by_guid
         try
         {
-            $object = midgard_object_class::get_object_by_guid($guid);
+            $object = \midgard_object_class::get_object_by_guid($guid);
         }
         catch (\midgard_error_exception $e)
         {
@@ -435,7 +438,7 @@ abstract class Midgard implements TransportInterface
     /**
      * Resolve objects path.
      */
-    function getPathForMidgardObject(&$object)
+    protected function getPathForMidgardObject(&$object)
     {
         $parts = array();
         $parts[] = $object->name;

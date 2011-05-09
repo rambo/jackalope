@@ -2,8 +2,79 @@
 require_once(dirname(__FILE__) . '/../src/Jackalope/autoloader.php');
 
 function getRepository($config) {
-    $transport = new \Jackalope\Transport\Midgard2();
+    $mgd = getMidgardConnection();
+
+    $transport = new \Jackalope\Transport\Midgard2($mgd);
     return new \Jackalope\Repository(null, null, $transport);
+}
+
+function prepareMidgardTestDir($dir)
+{
+    if (!file_exists("/tmp/JackalopeMidgard2/{$dir}"))
+    {
+        mkdir("/tmp/JackalopeMidgard2/{$dir}", 0777, true);
+    }
+}
+
+function getMidgardConnection() {
+    // Open connection
+    $midgard = \midgard_connection::get_instance();
+    if ($midgard->is_connected())
+    {
+        // Already connected
+        return $midgard;
+    }
+
+    prepareMidgardTestDir('share');
+    prepareMidgardTestDir('blobs');
+    prepareMidgardTestDir('var');
+    prepareMidgardTestDir('cache');
+
+    exec("cp -r Midgard2/share/* /tmp/JackalopeMidgard2/share");
+    exec("cp Midgard2/midgard2.conf /tmp/JackalopeMidgard2/midgard2.conf");
+    
+    $config = new \midgard_config();
+    $config->read_file_at_path("/tmp/JackalopeMidgard2/midgard2.conf");
+    if (!$midgard->open_config($config))
+    {
+        throw new Exception('Could not open Midgard connection to test database: ' . $midgard->get_error_string());
+    }
+
+    prepareMidgardStorage();
+
+    return $midgard;
+}
+
+function prepareMidgardStorage()
+{
+    midgard_storage::create_base_storage();
+
+    // And update as necessary
+    $re = new ReflectionExtension('midgard2');
+    $classes = $re->getClasses();
+    foreach ($classes as $refclass)
+    {
+        $parent_class = $refclass->getParentClass();
+        if (!$parent_class)
+        {
+            continue;
+        }
+        if ($parent_class->getName() != 'midgard_object')
+        {
+            continue;
+        }
+
+        $type = $refclass->getName();            
+        if (midgard_storage::class_storage_exists($type))
+        {
+            continue;
+        }
+
+        if (!midgard_storage::create_class_storage($type))
+        {
+            throw new Exception('Could not create ' . $type . ' tables in test database');
+        }
+    }
 }
 
 function getSimpleCredentials($user, $password) {
@@ -19,8 +90,8 @@ function getJCRSession($config, $credentials = null)
 
 function getFixtureLoader($config)
 {
-    require_once "midgard_importexport.php";
-    return new midgard_importexport(__DIR__."/suite/fixtures/");
+    require_once "Midgard2/Midgard2ImportExport.php";
+    return new Midgard2ImportExport(__DIR__."/suite/fixtures/");
 }
 
 define('SPEC_VERSION_DESC', 'jcr.specification.version');

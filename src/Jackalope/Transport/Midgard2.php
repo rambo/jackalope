@@ -94,7 +94,7 @@ class Midgard2 extends Midgard
     }
 
 
-    protected function getRootObjects()
+    protected function getRootObjects($workspacename)
     {
         // TODO: Choose the topic based on workspace name
         $q = new \midgard_query_select(new \midgard_query_storage('midgardmvc_core_node'));
